@@ -10,3 +10,4 @@
 .cxx
 *.png
 !**/res/**/*.png
+!site/*.png
