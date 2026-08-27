@@ -7,6 +7,7 @@ import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
 import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,12 +15,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -40,27 +43,67 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
-import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.ui.PlayerView
-import app.redlib.now.data.Repo
+import app.redlib.now.data.MediaCache
 import app.redlib.now.model.Post
-import app.redlib.now.net.Http
 import app.redlib.now.net.Logd
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import java.io.File
 
 /**
- * Full-screen media viewer: pinch-zoomable image, or HLS video via ExoPlayer
- * on the app's cookie-carrying OkHttp client.
+ * Full-screen media viewer. Videos play from a local, remuxed copy in our
+ * app-private cache (MediaCache): first view downloads with a progress bar,
+ * afterwards it's instant and works offline. Images are pinch-zoomable and
+ * also get a local copy for the 72h offline window.
  */
 @Composable
 fun MediaViewer(post: Post, onClose: () -> Unit) {
     BackHandler(onBack = onClose)
+
+    var videoFile by remember(post.id) { mutableStateOf<File?>(null) }
+    var downloadPct by remember(post.id) { mutableStateOf<Int?>(null) }
+    var downloadFailed by remember(post.id) { mutableStateOf(false) }
+    if (post.isVideo) {
+        LaunchedEffect(post.id) {
+            videoFile = MediaCache.videoReadyCopy(
+                absoluteUrl(post.videoUrl ?: post.imageUrl)
+            ) { pct -> downloadPct = pct }
+            downloadPct = null
+            if (videoFile == null) downloadFailed = true
+        }
+    }
+
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (post.isVideo) {
-            VideoPlayer(hlsVariantUrl(absoluteUrl(post.videoUrl ?: post.imageUrl)), Modifier.fillMaxSize())
+            val vf = videoFile
+            if (vf != null) {
+                VideoPlayer(android.net.Uri.fromFile(vf).toString(), Modifier.fillMaxSize())
+            } else {
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (downloadFailed) {
+                            Text(
+                                "Couldn't save this video.\nConnect to the internet and try again.",
+                                color = Color.White,
+                                style = MaterialTheme.typography.bodyMedium,
+                            )
+                        } else {
+                            CircularProgressIndicator(color = Color.White)
+                            downloadPct?.let {
+                                Text(
+                                    "saving for offline… $it%",
+                                    color = Color.White,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    modifier = Modifier.padding(top = 12.dp),
+                                )
+                            }
+                        }
+                    }
+                }
+            }
         } else {
             ZoomableImage(absoluteUrl(post.imageUrl))
         }
@@ -91,10 +134,13 @@ fun MediaViewer(post: Post, onClose: () -> Unit) {
 
 @Composable
 private fun ZoomableImage(url: String) {
+    // Serve the local copy when we have it; fetch one for offline otherwise.
+    val model = MediaCache.localUri(url) ?: url
+    LaunchedEffect(url) { if (MediaCache.localUri(url) == null) MediaCache.getOrDownload(url) }
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     AsyncImage(
-        model = ImageRequest.Builder(LocalContext.current).data(url).crossfade(false).build(),
+        model = ImageRequest.Builder(LocalContext.current).data(model).crossfade(false).build(),
         contentDescription = null,
         contentScale = ContentScale.Fit,
         modifier = Modifier
@@ -110,13 +156,11 @@ private fun ZoomableImage(url: String) {
                 // pinch is in progress or the image is zoomed in. A plain tap
                 // stays unconsumed so the close button on top stays clickable.
                 awaitEachGesture {
-                    val down = awaitFirstDown(requireUnconsumed = false)
-                    Logd.d("viewer gesture: down at ${down.position}")
+                    awaitFirstDown(requireUnconsumed = false)
                     do {
                         val event = awaitPointerEvent()
                         val pinching = event.changes.size > 1
                         if (pinching || scale > 1f) {
-                            Logd.d("viewer gesture: consuming (pinch=$pinching scale=$scale)")
                             val zoom = event.calculateZoom()
                             val pan = event.calculatePan()
                             scale = (scale * zoom).coerceIn(1f, 8f)
@@ -133,51 +177,29 @@ private fun ZoomableImage(url: String) {
 private fun VideoPlayer(url: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
     val player = remember(url) {
-        val dataSourceFactory = OkHttpDataSource.Factory(Http.client)
-            .setUserAgent(Http.USER_AGENT)
-        val mimeType = if (url.contains(".m3u8")) MimeTypes.APPLICATION_M3U8 else MimeTypes.VIDEO_MP4
-        ExoPlayer.Builder(context, DefaultMediaSourceFactory(dataSourceFactory))
+        // Default factory routes file:// to FileDataSource; everything we
+        // play here is a local file served by our own cache.
+        ExoPlayer.Builder(context, DefaultMediaSourceFactory(context))
             .build()
             .apply {
-                setMediaItem(
-                    MediaItem.Builder()
-                        .setUri(url)
-                        .setMimeType(mimeType)
-                        .build()
-                )
+                setMediaItem(MediaItem.fromUri(url))
                 addListener(object : Player.Listener {
                     override fun onPlaybackStateChanged(playbackState: Int) {
                         Logd.i("video: state=$playbackState (${STATE_NAMES.getOrElse(playbackState) {"?"}}) " +
-                            "uri=${currentMediaItem?.localConfiguration?.uri} pos=$currentPosition dur=$duration")
-                    }
-                    override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
-                        tracks.groups.forEach { g ->
-                            Logd.d("video: track type=${g.type} sel=${g.isSelected} fmt=${g.getTrackFormat(0)}")
+                            "uri=$url pos=$currentPosition dur=$duration")
+                        // Safety net: if the player ever reports ENDED well
+                        // before the end of the media, restart once instead
+                        // of leaving the user on a dead "replay" screen.
+                        if (playbackState == Player.STATE_ENDED &&
+                            duration > 0 && currentPosition < duration * 0.9
+                        ) {
+                            Logd.w("video: premature ENDED at ${currentPosition}ms/${duration}ms — restarting")
+                            seekTo(0)
+                            play()
                         }
-                    }
-                    override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
-                        Logd.d("video: timeline changed reason=$reason periods=${timeline.periodCount} windows=${timeline.windowCount}")
-                    }
-                    override fun onPositionDiscontinuity(
-                        oldPosition: Player.PositionInfo,
-                        newPosition: Player.PositionInfo,
-                        reason: Int
-                    ) {
-                        Logd.d("video: discontinuity reason=$reason ${oldPosition.positionMs}->${newPosition.positionMs}")
-                    }
-                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
-                        Logd.i("video: playWhenReady=$playWhenReady reason=$reason")
                     }
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         Logd.i("video: isPlaying=$isPlaying")
-                        if (isPlaying) {
-                            val handler = android.os.Handler(android.os.Looper.getMainLooper())
-                            repeat(12) { i ->
-                                handler.postDelayed({
-                                    Logd.d("video: pos=${currentPosition}ms dur=${duration}ms buf=${bufferedPercentage}%")
-                                }, (i + 1) * 500L)
-                            }
-                        }
                     }
                     override fun onPlayerError(error: PlaybackException) {
                         Logd.e("video: error ${error.errorCodeName}", error)
@@ -197,7 +219,7 @@ private fun VideoPlayer(url: String, modifier: Modifier = Modifier) {
 }
 
 private fun absoluteUrl(rel: String?): String {
-    val base = Repo.client.baseUrl() ?: ""
+    val base = app.redlib.now.data.Repo.client.baseUrl() ?: ""
     return when {
         rel == null -> ""
         rel.startsWith("http") -> rel
@@ -205,15 +227,4 @@ private fun absoluteUrl(rel: String?): String {
     }
 }
 
-/**
- * Reddit's HLS playlists (master *and* variant) trip up ExoPlayer: the
- * timeline is computed wrong and state jumps READY -> ENDED ~300ms in.
- * The byterange segments of those playlists are ranges of one real MP4,
- * which the instance serves fully — so just play that progressive MP4.
- */
-private fun hlsVariantUrl(url: String): String =
-    if (url.contains("/HLSPlaylist.m3u8")) {
-        url.substringBefore("HLSPlaylist.m3u8") + "CMAF_480.mp4"
-    } else url
-
-private val STATE_NAMES = arrayOf("IDLE", "BUFFERING", "READY", "ENDED")
+private val STATE_NAMES = arrayOf("", "IDLE", "BUFFERING", "READY", "ENDED")

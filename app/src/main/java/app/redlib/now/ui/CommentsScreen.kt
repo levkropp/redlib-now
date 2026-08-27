@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.redlib.now.data.FeedCache
 import app.redlib.now.data.Repo
 import app.redlib.now.model.Comment
 import app.redlib.now.model.Post
@@ -35,12 +36,16 @@ fun CommentsScreen(
     var error by remember { mutableStateOf<String?>(null) }
 
     LaunchedEffect(post.id) {
-        error = null
+        // Cache-first: show the offline thread immediately, refresh from network.
+        val cached = FeedCache.loadComments(post.permalink)
+        if (cached != null) comments = cached
         try {
             val resp = Repo.client.fetch(post.permalink)
-            comments = CommentParser.parseComments(resp.html, resp.baseUrl)
+            val parsed = CommentParser.parseComments(resp.html, resp.baseUrl)
+            comments = parsed
+            FeedCache.saveComments(post.permalink, parsed)
         } catch (t: Throwable) {
-            error = "Failed to load comments: ${t.message}"
+            if (comments == null) error = "Failed to load comments: ${t.message}"
         }
     }
 

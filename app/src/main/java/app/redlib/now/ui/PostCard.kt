@@ -93,7 +93,7 @@ fun PostCard(
                         .clickable(onClick = onOpenMedia),
                 ) {
                     AsyncImage(
-                        model = post.imageUrl,
+                        model = app.redlib.now.data.MediaCache.localUri(post.imageUrl) ?: post.imageUrl,
                         contentDescription = post.title,
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp),

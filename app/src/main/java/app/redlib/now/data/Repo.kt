@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.SharedPreferences
 import app.redlib.now.net.RedlibClient
 import org.json.JSONArray
+import app.redlib.now.data.MediaCache
+import app.redlib.now.data.FeedCache
 
 /** App-wide singletons: one RedlibClient (its cookie cache survives screens) and subreddit history. */
 object Repo {
@@ -17,6 +19,8 @@ object Repo {
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        MediaCache.init(context)
+        FeedCache.init(context)
     }
 
     fun history(): List<String> {
