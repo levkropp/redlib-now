@@ -4,6 +4,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -14,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import app.redlib.now.data.Repo
 import app.redlib.now.model.Post
 import kotlinx.coroutines.launch
 
@@ -55,14 +59,31 @@ fun FeedScreen(
                     )
                 }
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
-                listOf(
-                    "askreddit", "funny", "pics", "gaming", "movies", "music",
-                    "technology", "worldnews", "interestingasfuck", "mademesmile",
-                ).forEach { sub ->
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Filled.Add, contentDescription = null) },
+                    label = { Text("Add subreddit") },
+                    selected = false,
+                    onClick = onOpenSearch,
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                )
+                Repo.historyState.forEach { sub ->
                     NavigationDrawerItem(
+                        icon = { Icon(Icons.Filled.History, contentDescription = null) },
                         label = { Text("r/$sub") },
                         selected = currentFeed == "/r/$sub",
-                        onClick = { onOpenFeed("/r/$sub") },
+                        onClick = {
+                            Repo.add(sub)
+                            onOpenFeed("/r/$sub")
+                        },
+                        badge = {
+                            IconButton(onClick = { Repo.remove(sub) }) {
+                                Icon(
+                                    Icons.Filled.Close,
+                                    contentDescription = "Remove r/$sub",
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        },
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
                     )
                 }

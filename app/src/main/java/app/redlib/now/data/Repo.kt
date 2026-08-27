@@ -2,6 +2,9 @@ package app.redlib.now.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.mutableStateOf
 import app.redlib.now.net.RedlibClient
 import org.json.JSONArray
 import app.redlib.now.data.MediaCache
@@ -17,25 +20,37 @@ object Repo {
 
     private lateinit var prefs: SharedPreferences
 
+    /** Recent subreddits, most recent first. Backed by prefs, observable by Compose. */
+    var historyState by androidx.compose.runtime.mutableStateOf<List<String>>(emptyList())
+        private set
+
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         MediaCache.init(context)
         FeedCache.init(context)
+        historyState = load()
     }
 
-    fun history(): List<String> {
-        val arr = JSONArray(prefs.getString(KEY, "[]") ?: "[]")
-        return (0 until arr.length()).map { arr.getString(it) }
-    }
+    fun history(): List<String> = historyState
 
     fun add(sub: String) {
         val s = sub.trim().removePrefix("r/").removePrefix("/r/").lowercase()
         if (s.isEmpty()) return
-        val next = (listOf(s) + history().filter { it != s }).take(MAX)
+        val next = (listOf(s) + historyState.filter { it != s }).take(MAX)
         save(next)
+        historyState = next
     }
 
-    fun remove(sub: String) = save(history().filter { it != sub })
+    fun remove(sub: String) {
+        val next = historyState.filter { it != sub }
+        save(next)
+        historyState = next
+    }
+
+    private fun load(): List<String> {
+        val arr = JSONArray(prefs.getString(KEY, "[]") ?: "[]")
+        return (0 until arr.length()).map { arr.getString(it) }
+    }
 
     private fun save(list: List<String>) {
         prefs.edit().putString(KEY, JSONArray(list).toString()).apply()
