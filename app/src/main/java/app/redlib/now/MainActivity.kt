@@ -8,6 +8,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import app.redlib.now.data.Repo
 import app.redlib.now.model.Post
@@ -22,6 +25,13 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         Repo.init(applicationContext)
         enableEdgeToEdge()
+        // Immersive: status bar stays hidden while browsing, swipe from the
+        // top edge to bring it back transiently.
+        WindowCompat.getInsetsController(window, window.decorView).apply {
+            systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            hide(WindowInsetsCompat.Type.statusBars())
+        }
         setContent {
             NowRedlibTheme {
                 val vm: FeedViewModel = viewModel()
