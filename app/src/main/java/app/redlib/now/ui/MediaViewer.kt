@@ -38,6 +38,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -58,7 +60,7 @@ fun MediaViewer(post: Post, onClose: () -> Unit) {
     BackHandler(onBack = onClose)
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         if (post.isVideo) {
-            VideoPlayer(absoluteUrl(post.videoUrl ?: post.imageUrl), Modifier.fillMaxSize())
+            VideoPlayer(hlsVariantUrl(absoluteUrl(post.videoUrl ?: post.imageUrl)), Modifier.fillMaxSize())
         } else {
             ZoomableImage(absoluteUrl(post.imageUrl))
         }
@@ -143,6 +145,44 @@ private fun VideoPlayer(url: String, modifier: Modifier = Modifier) {
                         .setMimeType(mimeType)
                         .build()
                 )
+                addListener(object : Player.Listener {
+                    override fun onPlaybackStateChanged(playbackState: Int) {
+                        Logd.i("video: state=$playbackState (${STATE_NAMES.getOrElse(playbackState) {"?"}}) " +
+                            "uri=${currentMediaItem?.localConfiguration?.uri} pos=$currentPosition dur=$duration")
+                    }
+                    override fun onTracksChanged(tracks: androidx.media3.common.Tracks) {
+                        tracks.groups.forEach { g ->
+                            Logd.d("video: track type=${g.type} sel=${g.isSelected} fmt=${g.getTrackFormat(0)}")
+                        }
+                    }
+                    override fun onTimelineChanged(timeline: androidx.media3.common.Timeline, reason: Int) {
+                        Logd.d("video: timeline changed reason=$reason periods=${timeline.periodCount} windows=${timeline.windowCount}")
+                    }
+                    override fun onPositionDiscontinuity(
+                        oldPosition: Player.PositionInfo,
+                        newPosition: Player.PositionInfo,
+                        reason: Int
+                    ) {
+                        Logd.d("video: discontinuity reason=$reason ${oldPosition.positionMs}->${newPosition.positionMs}")
+                    }
+                    override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+                        Logd.i("video: playWhenReady=$playWhenReady reason=$reason")
+                    }
+                    override fun onIsPlayingChanged(isPlaying: Boolean) {
+                        Logd.i("video: isPlaying=$isPlaying")
+                        if (isPlaying) {
+                            val handler = android.os.Handler(android.os.Looper.getMainLooper())
+                            repeat(12) { i ->
+                                handler.postDelayed({
+                                    Logd.d("video: pos=${currentPosition}ms dur=${duration}ms buf=${bufferedPercentage}%")
+                                }, (i + 1) * 500L)
+                            }
+                        }
+                    }
+                    override fun onPlayerError(error: PlaybackException) {
+                        Logd.e("video: error ${error.errorCodeName}", error)
+                    }
+                })
                 prepare()
                 playWhenReady = true
             }
@@ -164,3 +204,16 @@ private fun absoluteUrl(rel: String?): String {
         else -> base + rel
     }
 }
+
+/**
+ * Reddit's HLS playlists (master *and* variant) trip up ExoPlayer: the
+ * timeline is computed wrong and state jumps READY -> ENDED ~300ms in.
+ * The byterange segments of those playlists are ranges of one real MP4,
+ * which the instance serves fully — so just play that progressive MP4.
+ */
+private fun hlsVariantUrl(url: String): String =
+    if (url.contains("/HLSPlaylist.m3u8")) {
+        url.substringBefore("HLSPlaylist.m3u8") + "CMAF_480.mp4"
+    } else url
+
+private val STATE_NAMES = arrayOf("IDLE", "BUFFERING", "READY", "ENDED")

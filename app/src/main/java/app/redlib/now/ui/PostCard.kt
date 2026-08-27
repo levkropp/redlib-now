@@ -3,10 +3,11 @@ package app.redlib.now.ui
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubbleOutline
-import androidx.compose.material.icons.filled.PlayCircleOutline
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -70,12 +71,6 @@ fun PostCard(
                 )
                 Spacer(Modifier.weight(1f))
                 if (post.nsfw) StatusPill("NSFW", NowColors.Nsfw)
-                if (post.isVideo) Icon(
-                    Icons.Filled.PlayCircleOutline,
-                    contentDescription = "video",
-                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                    modifier = Modifier.padding(start = 6.dp).size(16.dp),
-                )
             }
 
             Text(
@@ -88,18 +83,35 @@ fun PostCard(
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             )
 
-            // Media preview (tap = full screen).
+            // Media preview (tap = full screen). Videos get a centered play
+            // button overlay so they're unmistakable.
             if (post.imageUrl != null) {
-                AsyncImage(
-                    model = post.imageUrl,
-                    contentDescription = post.title,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier
+                Box(
+                    Modifier
                         .fillMaxWidth()
-                        .heightIn(max = 220.dp)
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable(onClick = onOpenMedia),
-                )
+                ) {
+                    AsyncImage(
+                        model = post.imageUrl,
+                        contentDescription = post.title,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp),
+                    )
+                    if (post.isVideo) {
+                        Icon(
+                            Icons.Filled.PlayArrow,
+                            contentDescription = "Play video",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(52.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.6f))
+                                .padding(10.dp),
+                        )
+                    }
+                }
             }
 
             post.selfTextPreview?.takeIf { post.imageUrl == null }?.let {
