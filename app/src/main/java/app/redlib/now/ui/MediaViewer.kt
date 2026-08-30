@@ -9,6 +9,7 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -20,12 +21,14 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
@@ -52,6 +55,7 @@ import app.redlib.now.net.Logd
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import java.io.File
+import kotlinx.coroutines.launch
 
 /**
  * Full-screen media viewer. Videos play from a local, remuxed copy in our
@@ -129,6 +133,94 @@ fun MediaViewer(post: Post, onClose: () -> Unit) {
                 modifier = Modifier.padding(start = 4.dp),
             )
         }
+
+        // Viewer actions (parity with the classic image menu): share the
+        // media file, copy its link, or save it to the public gallery.
+        val context = LocalContext.current
+        val clipboard = androidx.compose.ui.platform.LocalClipboardManager.current
+        val scope = rememberCoroutineScope()
+        var statusMsg by remember { mutableStateOf<String?>(null) }
+        Row(
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth()
+                .background(Color.Black.copy(alpha = 0.55f))
+                .padding(vertical = 6.dp),
+        ) {
+            TextButton(onClick = {
+                val url = absoluteUrl(post.imageUrl)
+                scope.launch {
+                    MediaCache.getOrDownload(url)?.let { f ->
+                        shareMedia(context, f, post.isVideo)
+                    } ?: run { statusMsg = "Nothing to share yet" }
+                }
+            }) { Text("Share", color = Color.White) }
+            TextButton(onClick = {
+                clipboard.setText(androidx.compose.ui.text.AnnotatedString(absoluteUrl(post.imageUrl)))
+                statusMsg = "Link copied"
+            }) { Text("Copy link", color = Color.White) }
+            TextButton(onClick = {
+                val url = absoluteUrl(post.imageUrl)
+                scope.launch {
+                    MediaCache.getOrDownload(url)?.let { f ->
+                        statusMsg = if (saveToGallery(context, f, post.isVideo)) "Saved to gallery" else "Save failed"
+                    } ?: run { statusMsg = "Nothing to save yet" }
+                }
+            }) { Text("Save", color = Color.White) }
+        }
+        statusMsg?.let {
+            Text(
+                it,
+                color = Color.White,
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 60.dp),
+            )
+        }
+    }
+}
+
+/** Share a cached media file through the FileProvider. */
+private fun shareMedia(context: android.content.Context, file: File, isVideo: Boolean) {
+    try {
+        val uri = androidx.core.content.FileProvider.getUriForFile(
+            context, "app.redlib.now.fileprovider", file)
+        val mime = if (isVideo || file.name.endsWith(".mp4")) "video/mp4" else "image/*"
+        val intent = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(android.content.Intent.EXTRA_STREAM, uri)
+            addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        context.startActivity(android.content.Intent.createChooser(intent, "Share media"))
+    } catch (t: Throwable) {
+        Logd.e("share failed", t)
+    }
+}
+
+/** Copy a cached media file into the public gallery (MediaStore, no permission needed on API 29+). */
+private fun saveToGallery(context: android.content.Context, file: File, isVideo: Boolean): Boolean {
+    try {
+        val resolver = context.contentResolver
+        val mime = if (isVideo || file.name.endsWith(".mp4")) "video/mp4" else "image/jpeg"
+        val collection = if (isVideo || file.name.endsWith(".mp4"))
+            android.provider.MediaStore.Video.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        else
+            android.provider.MediaStore.Images.Media.getContentUri(android.provider.MediaStore.VOLUME_EXTERNAL_PRIMARY)
+        val values = android.content.ContentValues().apply {
+            put(android.provider.MediaStore.MediaColumns.DISPLAY_NAME, "redlib-now-${System.currentTimeMillis()}.${if (mime=="video/mp4") "mp4" else "jpg"}")
+            put(android.provider.MediaStore.MediaColumns.MIME_TYPE, mime)
+            put(android.provider.MediaStore.MediaColumns.RELATIVE_PATH,
+                if (mime == "video/mp4") "Movies/RedlibNow" else "Pictures/RedlibNow")
+        }
+        val uri = resolver.insert(collection, values) ?: return false
+        resolver.openOutputStream(uri)?.use { out ->
+            file.inputStream().use { it.copyTo(out) }
+        } ?: return false
+        return true
+    } catch (t: Throwable) {
+        Logd.e("save to gallery failed", t)
+        return false
     }
 }
 

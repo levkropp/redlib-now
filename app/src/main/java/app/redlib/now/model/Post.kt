@@ -15,4 +15,6 @@ data class Post(
     val commentCount: Long?,
     val timeAgo: String?,           // e.g. "3h ago" as rendered by the instance
     val nsfw: Boolean,
+    val externalUrl: String? = null, // link posts: external article URL
+    val linkDomain: String? = null,  // link posts: e.g. "theguardian.com"
 )

@@ -69,6 +69,22 @@ object PostParser {
         val nsfw = el.classNames().any { it.equals("nsfw", true) } ||
             el.select(".post_flair").text().contains("NSFW", true)
 
+        // Link posts carry the external URL in a.post_thumbnail (with the
+        // domain in its <span>), optionally with a small preview image.
+        var externalUrl: String? = null
+        var linkDomain: String? = null
+        el.selectFirst("a.post_thumbnail")?.let { thumb ->
+            val href = thumb.attr("href")
+            if (href.startsWith("http")) {
+                externalUrl = href
+                linkDomain = thumb.selectFirst("span")?.text()?.trim()?.ifEmpty { null }
+                if (imageUrl == null) {
+                    thumb.selectFirst("img")?.attr("src")?.takeIf { it.isNotBlank() }
+                        ?.let { imageUrl = absolutize(it, baseUrl) }
+                }
+            }
+        }
+
         return Post(
             id = id,
             subreddit = subreddit,
@@ -84,6 +100,8 @@ object PostParser {
             commentCount = commentCount,
             timeAgo = timeAgo,
             nsfw = nsfw,
+            externalUrl = externalUrl,
+            linkDomain = linkDomain,
         )
     }
 

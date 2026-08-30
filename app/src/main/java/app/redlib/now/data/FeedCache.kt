@@ -86,6 +86,8 @@ object FeedCache {
         .put("commentCount", p.commentCount ?: -1)
         .put("timeAgo", p.timeAgo ?: "")
         .put("nsfw", p.nsfw)
+        .put("externalUrl", p.externalUrl ?: "")
+        .put("linkDomain", p.linkDomain ?: "")
 
     private fun parsePosts(arr: JSONArray): List<Post> = (0 until arr.length()).map { i ->
         val o = arr.getJSONObject(i)
@@ -104,6 +106,8 @@ object FeedCache {
             commentCount = o.getLong("commentCount").takeIf { it >= 0 },
             timeAgo = o.optString("timeAgo").ifEmpty { null },
             nsfw = o.getBoolean("nsfw"),
+            externalUrl = o.optString("externalUrl").ifEmpty { null },
+            linkDomain = o.optString("linkDomain").ifEmpty { null },
         )
     }
 

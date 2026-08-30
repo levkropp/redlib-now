@@ -7,6 +7,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -93,7 +94,7 @@ fun PostCard(
 
             // Media preview (tap = full screen). Videos get a centered play
             // button overlay so they're unmistakable.
-            if (post.imageUrl != null) {
+            if (post.imageUrl != null && post.externalUrl == null) {
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -117,6 +118,43 @@ fun PostCard(
                                 .clip(CircleShape)
                                 .background(Color.Black.copy(alpha = 0.6f))
                                 .padding(10.dp),
+                        )
+                    }
+                }
+            }
+
+            // External-link bar (reference card style): link icon, domain,
+            // small thumbnail when the instance provides one.
+            post.externalUrl?.let { url ->
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 10.dp, vertical = 6.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f))
+                        .padding(horizontal = 10.dp, vertical = 8.dp),
+                ) {
+                    Icon(
+                        Icons.Filled.Link,
+                        contentDescription = "External link",
+                        tint = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.size(16.dp),
+                    )
+                    Text(
+                        post.linkDomain ?: url.removePrefix("https://").removePrefix("http://").take(40),
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f).padding(start = 8.dp),
+                    )
+                    if (post.imageUrl != null) {
+                        AsyncImage(
+                            model = app.redlib.now.data.MediaCache.localUri(post.imageUrl) ?: post.imageUrl,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.size(44.dp).clip(RoundedCornerShape(6.dp)),
                         )
                     }
                 }
