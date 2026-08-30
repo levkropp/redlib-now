@@ -148,6 +148,7 @@ class MainActivity : ComponentActivity() {
                             postSearchOpen = true
                         },
                         onOpenFeed = { vm.load(it) },
+                        statePositions = vm.positions,
                     )
                 }
 
