@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,7 +41,10 @@ fun FeedScreen(
     onOpenComments: (Post) -> Unit,
     onOpenMedia: (Post) -> Unit,
     onOpenUser: (String) -> Unit,
+    onOpenSettings: () -> Unit,
     onOpenFeed: (String) -> Unit,
+    onMarkRead: (String) -> Unit = {},
+    statePositions: MutableMap<String, Pair<Int, Int>> = mutableMapOf(),
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
@@ -92,6 +96,14 @@ fun FeedScreen(
                         modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
                     )
                 }
+                HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
+                    label = { Text("Settings") },
+                    selected = false,
+                    onClick = onOpenSettings,
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                )
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
                 Text(
                     state.instanceStatus,
@@ -200,15 +212,29 @@ fun FeedScreen(
                 Modifier.fillMaxSize().padding(padding),
                 contentAlignment = Alignment.Center,
             ) { Text(if (state.error != null) state.error else "Nothing to show yet.") }
-            else -> LazyColumn(
-                Modifier.fillMaxSize().padding(padding),
+            else -> {
+                val remembered = if (app.redlib.now.data.Settings.rememberSubredditPosition) statePositions[currentFeed] else null
+                val listState = remember(currentFeed) {
+                    androidx.compose.foundation.lazy.LazyListState(
+                        firstVisibleItemIndex = remembered?.first ?: 0,
+                        firstVisibleItemScrollOffset = remembered?.second ?: 0,
+                    )
+                }
+                LaunchedEffect(listState, currentFeed) {
+                    androidx.compose.runtime.snapshotFlow {
+                        listState.firstVisibleItemIndex to listState.firstVisibleItemScrollOffset
+                    }.collect { statePositions[currentFeed] = it }
+                }
+                LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize().padding(padding),
                 contentPadding = PaddingValues(vertical = 4.dp),
             ) {
                 items(state.posts, key = { it.id }) { post ->
                     PostCard(
                         post = post,
                         onClick = { onOpenPost(post) },
-                        onOpenComments = { onOpenComments(post) },
+                        onOpenComments = { onMarkRead(post.id); onOpenComments(post) },
                         onOpenMedia = { onOpenMedia(post) },
                         onOpenUser = onOpenUser,
                     )
@@ -220,6 +246,7 @@ fun FeedScreen(
                         }
                     }
                 }
+            }
             }
         }
         }

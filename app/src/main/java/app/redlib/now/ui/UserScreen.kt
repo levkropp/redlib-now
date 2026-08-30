@@ -11,6 +11,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.redlib.now.data.FeedCache
@@ -46,7 +49,27 @@ fun UserScreen(
         }
     }
 
-    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Column(
+        Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+            .then(
+                if (app.redlib.now.data.Settings.swipeBack)
+                    Modifier.pointerInput(Unit) {
+                        awaitEachGesture {
+                            awaitFirstDown(requireUnconsumed = false)
+                            var acc = 0f
+                            do {
+                                val event = awaitPointerEvent()
+                                val ch = event.changes.firstOrNull()
+                if (ch != null) acc += ch.position.x - ch.previousPosition.x
+                            } while (event.changes.any { it.pressed })
+                            if (acc > 120f) onBack()
+                        }
+                    }
+                else Modifier
+            )
+    ) {
         TopAppBar(
             navigationIcon = {
                 IconButton(onClick = onBack) {

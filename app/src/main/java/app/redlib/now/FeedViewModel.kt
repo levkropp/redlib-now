@@ -8,6 +8,7 @@ import androidx.lifecycle.viewModelScope
 import app.redlib.now.data.FeedCache
 import app.redlib.now.data.MediaCache
 import app.redlib.now.data.Repo
+import app.redlib.now.data.Settings
 import app.redlib.now.model.Post
 import app.redlib.now.parse.PostParser
 import app.redlib.now.ui.FeedUiState
@@ -72,6 +73,8 @@ class FeedViewModel : ViewModel() {
             try {
                 val response = client.fetch(fetchPath(path))
                 val posts = PostParser.parseFeed(response.html, response.baseUrl)
+                    .filter { Settings.postVisible(it) }
+                    .filter { !Settings.hideReadPosts || !Repo.isRead(it.id) }
                 loadedPaths += path
                 state = FeedUiState(
                     loading = false,
@@ -96,4 +99,14 @@ class FeedViewModel : ViewModel() {
     }
 
     fun refresh() = load(currentPath)
+
+    /** Per-feed scroll positions ("remember subreddit position"). */
+    val positions = mutableMapOf<String, Pair<Int, Int>>()
+
+    fun markRead(id: String) {
+        Repo.markRead(id)
+        if (Settings.hideReadPosts) {
+            state = state.copy(posts = state.posts.filter { it.id != id })
+        }
+    }
 }

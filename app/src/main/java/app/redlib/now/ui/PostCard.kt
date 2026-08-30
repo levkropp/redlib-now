@@ -84,17 +84,17 @@ fun PostCard(
 
             Text(
                 post.title,
-                style = MaterialTheme.typography.titleSmall,
+                style = if (app.redlib.now.data.Settings.cardSize == "compact") MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold,
                 lineHeight = 17.sp,
-                maxLines = 3,
+                maxLines = if (app.redlib.now.data.Settings.cardSize == "large") 5 else 3,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
             )
 
             // Media preview (tap = full screen). Videos get a centered play
             // button overlay so they're unmistakable.
-            if (post.imageUrl != null && post.externalUrl == null) {
+            if (app.redlib.now.data.Settings.showMedia && post.imageUrl != null && post.externalUrl == null) {
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -105,7 +105,7 @@ fun PostCard(
                         model = app.redlib.now.data.MediaCache.localUri(post.imageUrl) ?: post.imageUrl,
                         contentDescription = post.title,
                         contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxWidth().heightIn(max = 220.dp),
+                        modifier = Modifier.fillMaxWidth().heightIn(max = if (app.redlib.now.data.Settings.cardSize == "large") 340.dp else if (app.redlib.now.data.Settings.cardSize == "normal") 280.dp else 220.dp),
                     )
                     if (post.isVideo) {
                         Icon(
@@ -126,6 +126,7 @@ fun PostCard(
             // External-link bar (reference card style): link icon, domain,
             // small thumbnail when the instance provides one.
             post.externalUrl?.let { url ->
+                if (!app.redlib.now.data.Settings.linkPreviews) return@let
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier
@@ -160,7 +161,7 @@ fun PostCard(
                 }
             }
 
-            post.selfTextPreview?.takeIf { post.imageUrl == null }?.let {
+            post.selfTextPreview?.takeIf { app.redlib.now.data.Settings.showSelftext && post.imageUrl == null }?.let {
                 Text(
                     it,
                     style = MaterialTheme.typography.bodySmall,

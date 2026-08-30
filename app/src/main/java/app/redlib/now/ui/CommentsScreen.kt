@@ -17,6 +17,9 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import app.redlib.now.data.FeedCache
@@ -38,7 +41,7 @@ fun CommentsScreen(
     BackHandler(onBack = onBack)
     var comments by remember { mutableStateOf<List<Comment>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
-    var sort by remember { mutableStateOf("best") }
+    var sort by remember { mutableStateOf(app.redlib.now.data.Settings.suggestedCommentSort) }
     var menuComment by remember { mutableStateOf<Comment?>(null) }
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
     val scope = rememberCoroutineScope()
@@ -77,6 +80,7 @@ fun CommentsScreen(
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
             .nestedScroll(scrollBehavior.nestedScrollConnection)
+            .swipeBack(enabled = app.redlib.now.data.Settings.swipeBack, onBack = onBack)
     ) {
         TopAppBar(
             actions = {
@@ -219,7 +223,9 @@ private fun CommentPostHeader(post: Post, onOpenMedia: (Post) -> Unit, onOpenUse
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun CommentNode(comment: Comment, depth: Int, onLongPress: (Comment) -> Unit = {}) {
-    var expanded by remember(comment.id) { mutableStateOf(true) }
+    val startCollapsed = (depth > 0 && app.redlib.now.data.Settings.collapseThreads) ||
+        (app.redlib.now.data.Settings.collapseAutoMod && comment.author.equals("AutoModerator", true))
+    var expanded by remember(comment.id) { mutableStateOf(!startCollapsed) }
     val replyCount = comment.replies.recursiveCount()
 
     Column(
@@ -294,6 +300,22 @@ private fun CommentNode(comment: Comment, depth: Int, onLongPress: (Comment) -> 
 }
 
 private fun List<Comment>.recursiveCount(): Long = sumOf { 1L + it.replies.recursiveCount() }
+
+/** Drag right to go back (classic "swipe back" gesture), when enabled. */
+private fun Modifier.swipeBack(enabled: Boolean, onBack: () -> Unit): Modifier =
+    this.pointerInput(enabled) {
+        if (!enabled) return@pointerInput
+        awaitEachGesture {
+            awaitFirstDown(requireUnconsumed = false)
+            var acc = 0f
+            do {
+                val event = awaitPointerEvent()
+                val ch = event.changes.firstOrNull()
+                if (ch != null) acc += ch.position.x - ch.previousPosition.x
+            } while (event.changes.any { it.pressed })
+            if (acc > 120f) onBack()
+        }
+    }
 
 private fun Long.formatScore(): String = when {
     this >= 1_000_000 -> "%.1fm".format(this / 1_000_000f)

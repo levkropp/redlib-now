@@ -28,7 +28,25 @@ object Repo {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
         MediaCache.init(context)
         FeedCache.init(context)
-        historyState = load()
+        Settings.init(context)
+        readPosts = loadReadPosts()
+    }
+
+    // ---- read-post tracking (for "hide read posts") ----
+    private val READ_KEY = "read_posts"
+    private val MAX_READ = 500
+    private var readPosts: LinkedHashSet<String> = LinkedHashSet()
+
+    private fun loadReadPosts(): LinkedHashSet<String> =
+        LinkedHashSet(prefs.getString(READ_KEY, "")!!.split(",").filter { it.isNotBlank() })
+
+    fun isRead(id: String): Boolean = id in readPosts
+
+    fun markRead(id: String) {
+        if (id in readPosts) return
+        readPosts.add(id)
+        while (readPosts.size > MAX_READ) readPosts.remove(readPosts.first())
+        prefs.edit().putString(READ_KEY, readPosts.joinToString(",")).apply()
     }
 
     fun history(): List<String> = historyState
