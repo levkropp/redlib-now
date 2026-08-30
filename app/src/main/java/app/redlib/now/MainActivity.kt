@@ -59,6 +59,9 @@ class MainActivity : ComponentActivity() {
                     else -> FeedScreen(
                         state = vm.state,
                         currentFeed = vm.currentPath,
+                        feedSort = vm.feedSort,
+                        feedTime = vm.feedTime,
+                        onSort = { s, t -> vm.setSort(s, t) },
                         onOpenSearch = { showSearch = true },
                         onRefresh = { vm.refresh() },
                         onOpenPost = { post ->

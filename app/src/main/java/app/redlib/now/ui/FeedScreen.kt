@@ -5,6 +5,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Menu
@@ -30,6 +31,9 @@ import kotlinx.coroutines.launch
 fun FeedScreen(
     state: FeedUiState,
     currentFeed: String,
+    feedSort: String,
+    feedTime: String,
+    onSort: (String, String) -> Unit,
     onOpenSearch: () -> Unit,
     onRefresh: () -> Unit,
     onOpenPost: (Post) -> Unit,
@@ -125,6 +129,38 @@ fun FeedScreen(
                     )
                 },
                 actions = {
+                    // Sort menu (parity with the classic app's sort options).
+                    var sortMenuOpen by remember { mutableStateOf(false) }
+                    TextButton(onClick = { sortMenuOpen = true }) {
+                        Text(
+                            sortLabel(feedSort, feedTime),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
+                        Icon(
+                            Icons.Filled.KeyboardArrowDown,
+                            contentDescription = "Sort",
+                            tint = MaterialTheme.colorScheme.primary,
+                        )
+                        DropdownMenu(expanded = sortMenuOpen, onDismissRequest = { sortMenuOpen = false }) {
+                            listOf("hot" to "Hot", "new" to "New", "rising" to "Rising").forEach { (id, label) ->
+                                DropdownMenuItem(
+                                    text = { Text(label) },
+                                    onClick = { onSort(id, "all"); sortMenuOpen = false },
+                                )
+                            }
+                            HorizontalDivider()
+                            listOf("top" to "Top", "controversial" to "Controversial").forEach { (id, label) ->
+                                listOf("hour" to "Past hour", "day" to "Today", "week" to "This week",
+                                    "month" to "This month", "year" to "This year", "all" to "All time").forEach { (t, tl) ->
+                                    DropdownMenuItem(
+                                        text = { Text("$label · $tl") },
+                                        onClick = { onSort(id, t); sortMenuOpen = false },
+                                    )
+                                }
+                            }
+                        }
+                    }
                     IconButton(onClick = onOpenSearch) {
                         Icon(Icons.Filled.Search, contentDescription = "Search subreddits")
                     }
@@ -194,3 +230,20 @@ data class FeedUiState(
     val error: String? = null,
     val instanceStatus: String = "",
 )
+
+private fun sortLabel(sort: String, time: String): String = when (sort) {
+    "hot" -> "Hot"
+    "new" -> "New"
+    "rising" -> "Rising"
+    else -> {
+        val base = if (sort == "top") "Top" else "Controversial"
+        base + when (time) {
+            "hour" -> " · Hour"
+            "day" -> " · Today"
+            "week" -> " · Week"
+            "month" -> " · Month"
+            "year" -> " · Year"
+            else -> " · All"
+        }
+    }
+}

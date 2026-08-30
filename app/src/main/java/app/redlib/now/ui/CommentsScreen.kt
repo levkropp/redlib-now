@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,16 +35,18 @@ fun CommentsScreen(
     BackHandler(onBack = onBack)
     var comments by remember { mutableStateOf<List<Comment>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
+    var sort by remember { mutableStateOf("best") }
 
-    LaunchedEffect(post.id) {
+    LaunchedEffect(post.id, sort) {
         // Cache-first: show the offline thread immediately, refresh from network.
-        val cached = FeedCache.loadComments(post.permalink)
+        val key = post.permalink + "?sort=" + sort
+        val cached = FeedCache.loadComments(key)
         if (cached != null) comments = cached
         try {
-            val resp = Repo.client.fetch(post.permalink)
+            val resp = Repo.client.fetch(post.permalink + if (sort == "best") "" else "?sort=$sort")
             val parsed = CommentParser.parseComments(resp.html, resp.baseUrl)
             comments = parsed
-            FeedCache.saveComments(post.permalink, parsed)
+            FeedCache.saveComments(key, parsed)
         } catch (t: Throwable) {
             if (comments == null) error = "Failed to load comments: ${t.message}"
         }
@@ -58,6 +61,29 @@ fun CommentsScreen(
             .nestedScroll(scrollBehavior.nestedScrollConnection)
     ) {
         TopAppBar(
+            actions = {
+                var sortMenuOpen by remember { mutableStateOf(false) }
+                TextButton(onClick = { sortMenuOpen = true }) {
+                    Text(
+                        sort.replaceFirstChar { it.uppercase() },
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                    Icon(
+                        Icons.Filled.KeyboardArrowDown,
+                        contentDescription = "Sort comments",
+                        tint = MaterialTheme.colorScheme.primary,
+                    )
+                    DropdownMenu(expanded = sortMenuOpen, onDismissRequest = { sortMenuOpen = false }) {
+                        listOf("best", "top", "new", "old", "controversial", "qa").forEach { s ->
+                            DropdownMenuItem(
+                                text = { Text(s.replaceFirstChar { it.uppercase() }) },
+                                onClick = { sort = s; sortMenuOpen = false },
+                            )
+                        }
+                    }
+                }
+            },
             scrollBehavior = scrollBehavior,
             colors = TopAppBarDefaults.topAppBarColors(
                 containerColor = MaterialTheme.colorScheme.background,

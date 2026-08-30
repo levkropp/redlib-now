@@ -23,10 +23,34 @@ class FeedViewModel : ViewModel() {
     var currentPath by mutableStateOf("/")
         private set
 
+    // Sort state (parity with the classic app's sort menus).
+    var feedSort by mutableStateOf("hot")      // hot, new, rising, top, controversial
+        private set
+    var feedTime by mutableStateOf("all")      // hour, day, week, month, year, all
+        private set
+
     private val loadedPaths = mutableSetOf<String>()
 
     init {
         load("/", initial = true)
+    }
+
+    fun setSort(sort: String, time: String = feedTime) {
+        feedSort = sort
+        feedTime = time
+        load(currentPath)
+    }
+
+    /** Full fetch path for the current feed + sort. */
+    private fun fetchPath(base: String): String {
+        val sort = if (feedSort == "hot") "" else "/$feedSort"
+        val time = if (feedSort == "top" || feedSort == "controversial") "?t=$feedTime" else ""
+        val joined = if (base == "/") "/${feedSort}" else "$base$sort"
+        return when {
+            feedSort == "hot" -> base
+            base == "/" -> joined + time   // e.g. /new, /top?t=week
+            else -> base + sort + time     // e.g. /r/aww/new, /r/aww/top?t=week
+        }
     }
 
     fun load(path: String, initial: Boolean = false) {
@@ -46,7 +70,7 @@ class FeedViewModel : ViewModel() {
 
         viewModelScope.launch {
             try {
-                val response = client.fetch(pathWithSort(path))
+                val response = client.fetch(fetchPath(path))
                 val posts = PostParser.parseFeed(response.html, response.baseUrl)
                 loadedPaths += path
                 state = FeedUiState(
@@ -72,6 +96,4 @@ class FeedViewModel : ViewModel() {
     }
 
     fun refresh() = load(currentPath)
-
-    private fun pathWithSort(path: String): String = path
 }
