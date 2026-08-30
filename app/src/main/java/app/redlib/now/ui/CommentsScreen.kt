@@ -291,6 +291,22 @@ private fun CommentNode(comment: Comment, depth: Int, onLongPress: (Comment) -> 
                     modifier = Modifier.padding(top = 3.dp),
                 )
             }
+            // Inline image media attached to the comment (reddit-hosted
+            // images render as <figure><img>; image-only comments would
+            // otherwise parse to an empty body).
+            comment.imageUrl?.let { url ->
+                coil.compose.AsyncImage(
+                    model = app.redlib.now.data.MediaCache.localUri(url) ?: url,
+                    contentDescription = null,
+                    contentScale = androidx.compose.ui.layout.ContentScale.Fit,
+                    modifier = Modifier
+                        .padding(top = 6.dp)
+                        .width(240.dp)
+                        .height(200.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                )
+            }
             // Giphy links render as inline auto-playing (muted, looping) clips.
             extractGiphyIds(comment.body).forEach { id ->
                 GifClip(id)
@@ -315,30 +331,56 @@ private fun List<Comment>.recursiveCount(): Long = sumOf { 1L + it.replies.recur
 private fun GifClip(id: String) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val url = "https://media.giphy.com/media/$id/giphy-downsized-small.mp4"
-    val player = remember(id) {
+    var failed by remember(id) { mutableStateOf(false) }
+    var attempt by remember(id) { mutableIntStateOf(0) }
+    val player = remember(id, attempt) {
         androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
             setMediaItem(androidx.media3.common.MediaItem.fromUri(url))
             repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE
             volume = 0f
+            addListener(object : androidx.media3.common.Player.Listener {
+                override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                    app.redlib.now.net.Logd.e("giphy clip failed id=$id url=$url", error)
+                    failed = true
+                }
+            })
             prepare()
             playWhenReady = true
         }
     }
-    androidx.compose.runtime.DisposableEffect(id) {
+    androidx.compose.runtime.DisposableEffect(id, attempt) {
         onDispose { player.release() }
     }
-    androidx.compose.ui.viewinterop.AndroidView(
-        factory = { ctx -> androidx.media3.ui.PlayerView(ctx).apply {
-            this.player = player
-            useController = false
-        } },
+    Box(
         modifier = Modifier
             .padding(top = 6.dp)
             .width(220.dp)
             .height(180.dp)
             .clip(RoundedCornerShape(8.dp))
             .background(MaterialTheme.colorScheme.surfaceVariant),
-    )
+    ) {
+        if (!failed) {
+            androidx.compose.ui.viewinterop.AndroidView(
+                factory = { ctx -> androidx.media3.ui.PlayerView(ctx).apply {
+                    this.player = player
+                    useController = false
+                } },
+                modifier = Modifier.fillMaxSize(),
+            )
+        } else {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+                modifier = Modifier.fillMaxSize(),
+            ) {
+                Text("GIF failed to load", style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant)
+                TextButton(onClick = { failed = false; attempt++ }) {
+                    Text("Retry", color = MaterialTheme.colorScheme.primary)
+                }
+            }
+        }
+    }
 }
 
 /** Drag right to go back (classic "swipe back" gesture), when enabled. */

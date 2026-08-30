@@ -9,5 +9,6 @@ data class Comment(
     val isOp: Boolean,
     val isMod: Boolean,
     val parentId: String?,     // id of the parent comment, null for top-level
+    val imageUrl: String? = null,  // inline media extracted from the body (instance-proxy)
     val replies: List<Comment>,
 )

@@ -11,6 +11,7 @@ import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -191,6 +192,21 @@ fun PostCard(
                     Spacer(Modifier.width(4.dp))
                 }
                 Spacer(Modifier.weight(1f))
+                val context = androidx.compose.ui.platform.LocalContext.current
+                IconButton(
+                    onClick = {
+                        val send = android.content.Intent(android.content.Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(android.content.Intent.EXTRA_SUBJECT, post.title)
+                            putExtra(android.content.Intent.EXTRA_TEXT, post.title + "\n\n" + "https://reddit.com" + post.permalink)
+                        }
+                        context.startActivity(android.content.Intent.createChooser(send, "Share post"))
+                    },
+                    modifier = Modifier.size(32.dp),
+                ) {
+                    Icon(Icons.Filled.Share, contentDescription = "Share post",
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.size(16.dp))
+                }
                 IconButton(onClick = { app.redlib.now.data.Repo.toggleSave(post) }, modifier = Modifier.size(32.dp)) {
                     Icon(
                         if (app.redlib.now.data.Repo.isSaved(post.id)) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
