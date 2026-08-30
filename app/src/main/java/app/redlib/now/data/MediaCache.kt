@@ -89,6 +89,13 @@ object MediaCache {
                         }
                     }
                 }
+                // Sanity: some CDNs answer bot-walls with 200 + HTML.
+                if (tmp.length() > 16 && tmp.inputStream().use { it.readNBytes(256).toString(Charsets.ISO_8859_1) }
+                        .lowercase().let { it.contains("<html") || it.contains("<!doctype") }) {
+                    Logd.w("media download returned HTML (bot wall?), discarding: $url")
+                    tmp.delete()
+                    return@withContext null
+                }
                 val ok = tmp.renameTo(f)
                 return@withContext if (ok && f.length() > 0L) f else null
             } catch (t: Throwable) {

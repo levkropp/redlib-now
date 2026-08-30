@@ -64,16 +64,22 @@ import kotlinx.coroutines.launch
  * also get a local copy for the 72h offline window.
  */
 @Composable
-fun MediaViewer(post: Post, onClose: () -> Unit) {
-    BackHandler(onBack = onClose)
+fun MediaViewer(post: Post, onClose: () -> Unit) =
+    MediaViewer(post.title, post.imageUrl, post.videoUrl, post.isVideo, onClose)
 
-    var videoFile by remember(post.id) { mutableStateOf<File?>(null) }
-    var downloadPct by remember(post.id) { mutableStateOf<Int?>(null) }
-    var downloadFailed by remember(post.id) { mutableStateOf(false) }
-    if (post.isVideo) {
-        LaunchedEffect(post.id) {
+/** Fullscreen media viewer over primitives — reusable for posts and comment media. */
+@Composable
+fun MediaViewer(title: String, imageUrl: String?, videoUrl: String?, isVideo: Boolean, onClose: () -> Unit) {
+    BackHandler(onBack = onClose)
+    val key = title + "|" + (videoUrl ?: imageUrl ?: "")
+
+    var videoFile by remember(key) { mutableStateOf<File?>(null) }
+    var downloadPct by remember(key) { mutableStateOf<Int?>(null) }
+    var downloadFailed by remember(key) { mutableStateOf(false) }
+    if (isVideo) {
+        LaunchedEffect(key) {
             videoFile = MediaCache.videoReadyCopy(
-                absoluteUrl(post.videoUrl ?: post.imageUrl)
+                absoluteUrl(videoUrl ?: imageUrl)
             ) { pct -> downloadPct = pct }
             downloadPct = null
             if (videoFile == null) downloadFailed = true
@@ -81,7 +87,7 @@ fun MediaViewer(post: Post, onClose: () -> Unit) {
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        if (post.isVideo) {
+        if (isVideo) {
             val vf = videoFile
             if (vf != null) {
                 VideoPlayer(android.net.Uri.fromFile(vf).toString(), Modifier.fillMaxSize())
@@ -109,7 +115,7 @@ fun MediaViewer(post: Post, onClose: () -> Unit) {
                 }
             }
         } else {
-            ZoomableImage(absoluteUrl(post.imageUrl), onClose = if (app.redlib.now.data.Settings.tapToCloseImages) onClose else ({ }))
+            ZoomableImage(absoluteUrl(imageUrl), onClose = if (app.redlib.now.data.Settings.tapToCloseImages) onClose else ({ }))
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -125,7 +131,7 @@ fun MediaViewer(post: Post, onClose: () -> Unit) {
                 Icon(Icons.Filled.Close, contentDescription = "Close", tint = Color.White)
             }
             Text(
-                post.title,
+                title,
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFFB8AEA6),
                 maxLines = 1,
@@ -150,22 +156,22 @@ fun MediaViewer(post: Post, onClose: () -> Unit) {
                 .padding(vertical = 6.dp),
         ) {
             TextButton(onClick = {
-                val url = absoluteUrl(post.imageUrl)
+                val url = absoluteUrl(imageUrl)
                 scope.launch {
                     MediaCache.getOrDownload(url)?.let { f ->
-                        shareMedia(context, f, post.isVideo)
+                        shareMedia(context, f, isVideo)
                     } ?: run { statusMsg = "Nothing to share yet" }
                 }
             }) { Text("Share", color = Color.White) }
             TextButton(onClick = {
-                clipboard.setText(androidx.compose.ui.text.AnnotatedString(absoluteUrl(post.imageUrl)))
+                clipboard.setText(androidx.compose.ui.text.AnnotatedString(absoluteUrl(imageUrl)))
                 statusMsg = "Link copied"
             }) { Text("Copy link", color = Color.White) }
             TextButton(onClick = {
-                val url = absoluteUrl(post.imageUrl)
+                val url = absoluteUrl(imageUrl)
                 scope.launch {
                     MediaCache.getOrDownload(url)?.let { f ->
-                        statusMsg = if (saveToGallery(context, f, post.isVideo)) "Saved to gallery" else "Save failed"
+                        statusMsg = if (saveToGallery(context, f, isVideo)) "Saved to gallery" else "Save failed"
                     } ?: run { statusMsg = "Nothing to save yet" }
                 }
             }) { Text("Save", color = Color.White) }

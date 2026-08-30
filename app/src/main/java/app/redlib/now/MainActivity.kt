@@ -61,8 +61,16 @@ class MainActivity : ComponentActivity() {
                 var showBrowse by remember { mutableStateOf(false) }
                 var postSearchSub by remember { mutableStateOf<String?>(null) }
                 var postSearchOpen by remember { mutableStateOf(false) }
+                var commentMedia by remember { mutableStateOf<Triple<String, String?, Boolean>?>(null) }
 
                 when {
+                    commentMedia != null -> MediaViewer(
+                        title = commentMedia!!.first,
+                        imageUrl = commentMedia!!.second,
+                        videoUrl = if (commentMedia!!.third) commentMedia!!.second else null,
+                        isVideo = commentMedia!!.third,
+                        onClose = { commentMedia = null },
+                    )
                     showSettings -> SettingsScreen(onBack = { showSettings = false })
                     showSaved -> SavedScreen(
                         onBack = { showSaved = false },
@@ -109,6 +117,7 @@ class MainActivity : ComponentActivity() {
                         onBack = { commentsPost = null },
                         onOpenMedia = { viewerPost = it },
                         onOpenUser = { userProfile = it },
+                        onOpenCommentMedia = { url, isVideo -> commentMedia = Triple("Comment media", url, isVideo) },
                     )
                     showSearch -> SearchScreen(
                         onDismiss = { showSearch = false },

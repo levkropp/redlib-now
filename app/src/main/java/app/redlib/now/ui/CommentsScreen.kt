@@ -38,6 +38,7 @@ fun CommentsScreen(
     onBack: () -> Unit,
     onOpenMedia: (Post) -> Unit,
     onOpenUser: (String) -> Unit = {},
+    onOpenCommentMedia: (String, Boolean) -> Unit = { _, _ -> },
 ) {
     BackHandler(onBack = onBack)
     var comments by remember { mutableStateOf<List<Comment>?>(null) }
@@ -147,7 +148,7 @@ fun CommentsScreen(
                     CommentPostHeader(post, onOpenMedia, onOpenUser)
                 }
                 items(comments!!, key = { it.id }) { c ->
-                    CommentNode(c, depth = 0, onLongPress = { menuComment = it })
+                    CommentNode(c, depth = 0, onLongPress = { menuComment = it }, onOpenMedia = onOpenCommentMedia)
                 }
                 if (comments!!.isEmpty()) {
                     item { Text("No comments yet.", Modifier.padding(16.dp), color = MaterialTheme.colorScheme.onSurfaceVariant) }
@@ -223,7 +224,12 @@ private fun CommentPostHeader(post: Post, onOpenMedia: (Post) -> Unit, onOpenUse
 
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
-private fun CommentNode(comment: Comment, depth: Int, onLongPress: (Comment) -> Unit = {}) {
+private fun CommentNode(
+    comment: Comment,
+    depth: Int,
+    onLongPress: (Comment) -> Unit = {},
+    onOpenMedia: (String, Boolean) -> Unit = { _, _ -> },
+) {
     // First four levels always expand; the collapse setting folds level 5+.
     val startCollapsed = (depth > 4 && app.redlib.now.data.Settings.collapseThreads) ||
         (app.redlib.now.data.Settings.collapseAutoMod && comment.author.equals("AutoModerator", true))
@@ -304,14 +310,15 @@ private fun CommentNode(comment: Comment, depth: Int, onLongPress: (Comment) -> 
                         .width(240.dp)
                         .height(200.dp)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .clickable { onOpenMedia(url, false) },
                 )
             }
             // Giphy links render as inline auto-playing (muted, looping) clips.
             extractGiphyIds(comment.body).forEach { id ->
-                GifClip(id)
+                GifClip(id, onOpen = { onOpenMedia(it, true) })
             }
-            comment.replies.forEach { CommentNode(it, depth + 1, onLongPress) }
+            comment.replies.forEach { CommentNode(it, depth + 1, onLongPress, onOpenMedia) }
         } else if (replyCount > 0) {
             Text(
                 "$replyCount ${if (replyCount == 1L) "reply" else "replies"} hidden",
@@ -328,7 +335,7 @@ private fun List<Comment>.recursiveCount(): Long = sumOf { 1L + it.replies.recur
 
 /** Inline auto-playing giphy clip: muted, looping mp4 via ExoPlayer. */
 @Composable
-private fun GifClip(id: String) {
+private fun GifClip(id: String, onOpen: (String) -> Unit = {}) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val url = "https://media.giphy.com/media/$id/giphy-downsized-small.mp4"
     var failed by remember(id) { mutableStateOf(false) }
@@ -357,7 +364,8 @@ private fun GifClip(id: String) {
             .width(220.dp)
             .height(180.dp)
             .clip(RoundedCornerShape(8.dp))
-            .background(MaterialTheme.colorScheme.surfaceVariant),
+            .background(MaterialTheme.colorScheme.surfaceVariant)
+            .clickable { onOpen(url) },
     ) {
         if (!failed) {
             androidx.compose.ui.viewinterop.AndroidView(

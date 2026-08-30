@@ -60,7 +60,7 @@ object Http {
             val resp = chain.proceed(
                 req.newBuilder()
                     .header("User-Agent", USER_AGENT)
-                    .header("Accept", "text/html,application/xhtml+xml,*/*;q=0.8")
+                    .header("Accept", "*/*")
                     .header("Accept-Language", "en-US,en;q=0.9")
                     .build()
             )
