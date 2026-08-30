@@ -1,6 +1,7 @@
 package app.redlib.now.ui
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -25,7 +26,11 @@ fun SavedScreen(
     onOpenMedia: (Post) -> Unit,
 ) {
     BackHandler(onBack = onBack)
-    Column(Modifier.fillMaxSize()) {
+    Surface(
+        Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Column(Modifier.fillMaxSize()) {
         TopAppBar(
             navigationIcon = {
                 IconButton(onClick = onBack) {
@@ -51,5 +56,6 @@ fun SavedScreen(
                 }
             }
         }
+    }
     }
 }

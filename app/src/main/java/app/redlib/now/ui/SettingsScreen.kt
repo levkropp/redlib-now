@@ -2,6 +2,7 @@ package app.redlib.now.ui
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.rememberScrollState
@@ -21,7 +22,11 @@ import app.redlib.now.data.Settings
 @Composable
 fun SettingsScreen(onBack: () -> Unit) {
     BackHandler(onBack = onBack)
-    Column(Modifier.fillMaxSize()) {
+    Surface(
+        Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Column(Modifier.fillMaxSize()) {
         TopAppBar(
             navigationIcon = {
                 IconButton(onClick = onBack) {
@@ -71,6 +76,7 @@ fun SettingsScreen(onBack: () -> Unit) {
             item { SwitchRow("Swipe back", Settings.swipeBack) { Settings.updateSwipeBack(it) } }
             item { SwitchRow("Tap to close images & videos", Settings.tapToCloseImages) { Settings.updateTapToClose(it) } }
         }
+    }
     }
 }
 

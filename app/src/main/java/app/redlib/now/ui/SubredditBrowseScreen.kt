@@ -35,7 +35,11 @@ fun SubredditBrowseScreen(
 
     val subs = remember { (Repo.historyState + Repo.SUGGESTIONS).distinct() }
 
-    Column(Modifier.fillMaxSize()) {
+    Surface(
+        Modifier.fillMaxSize(),
+        color = MaterialTheme.colorScheme.background,
+    ) {
+        Column(Modifier.fillMaxSize()) {
         TopAppBar(
             navigationIcon = {
                 IconButton(onClick = onBack) {
@@ -95,5 +99,6 @@ fun SubredditBrowseScreen(
                 }
             }
         }
+    }
     }
 }
