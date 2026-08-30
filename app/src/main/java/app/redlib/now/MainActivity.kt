@@ -19,6 +19,7 @@ import app.redlib.now.ui.FeedScreen
 import app.redlib.now.ui.MediaViewer
 import app.redlib.now.ui.NowRedlibTheme
 import app.redlib.now.ui.SearchScreen
+import app.redlib.now.ui.UserScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,6 +38,7 @@ class MainActivity : ComponentActivity() {
                 val vm: FeedViewModel = viewModel()
                 var viewerPost by remember { mutableStateOf<Post?>(null) }
                 var commentsPost by remember { mutableStateOf<Post?>(null) }
+                var userProfile by remember { mutableStateOf<String?>(null) }
                 var showSearch by remember { mutableStateOf(false) }
 
                 when {
@@ -44,10 +46,21 @@ class MainActivity : ComponentActivity() {
                         post = viewerPost!!,
                         onClose = { viewerPost = null },
                     )
+                    userProfile != null -> UserScreen(
+                        username = userProfile!!,
+                        onBack = { userProfile = null },
+                        onOpenPost = { post ->
+                            userProfile = null
+                            if (post.imageUrl != null) viewerPost = post else commentsPost = post
+                        },
+                        onOpenComments = { commentsPost = it },
+                        onOpenMedia = { viewerPost = it },
+                    )
                     commentsPost != null -> CommentsScreen(
                         post = commentsPost!!,
                         onBack = { commentsPost = null },
                         onOpenMedia = { viewerPost = it },
+                        onOpenUser = { userProfile = it },
                     )
                     showSearch -> SearchScreen(
                         onDismiss = { showSearch = false },
@@ -69,6 +82,7 @@ class MainActivity : ComponentActivity() {
                         },
                         onOpenComments = { commentsPost = it },
                         onOpenMedia = { viewerPost = it },
+                        onOpenUser = { userProfile = it },
                         onOpenFeed = { vm.load(it) },
                     )
                 }

@@ -8,5 +8,6 @@ data class Comment(
     val body: String,          // plain text, paragraphs separated by \n\n
     val isOp: Boolean,
     val isMod: Boolean,
+    val parentId: String?,     // id of the parent comment, null for top-level
     val replies: List<Comment>,
 )

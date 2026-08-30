@@ -39,6 +39,7 @@ fun FeedScreen(
     onOpenPost: (Post) -> Unit,
     onOpenComments: (Post) -> Unit,
     onOpenMedia: (Post) -> Unit,
+    onOpenUser: (String) -> Unit,
     onOpenFeed: (String) -> Unit,
 ) {
     val drawerState = rememberDrawerState(DrawerValue.Closed)
@@ -209,6 +210,7 @@ fun FeedScreen(
                         onClick = { onOpenPost(post) },
                         onOpenComments = { onOpenComments(post) },
                         onOpenMedia = { onOpenMedia(post) },
+                        onOpenUser = onOpenUser,
                     )
                 }
                 if (state.loading) {

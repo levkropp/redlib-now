@@ -11,10 +11,10 @@ object CommentParser {
         val doc = Jsoup.parse(html, baseUrl)
         val threads = doc.select("div.thread > div.comment")
         if (threads.isEmpty()) return emptyList()
-        return threads.mapNotNull { parseComment(it) }
+        return threads.mapNotNull { parseComment(it, null) }
     }
 
-    private fun parseComment(el: Element): Comment? {
+    private fun parseComment(el: Element, parentId: String?): Comment? {
         val id = el.id().ifEmpty { return null }
         val authorEl = el.selectFirst("a.comment_author")
         val author = authorEl?.text()?.trim()?.removePrefix("u/")?.removePrefix("/u/")?.ifEmpty { null }
@@ -28,8 +28,8 @@ object CommentParser {
         val bodyEl = el.selectFirst("div.comment_body")
         val body = bodyEl?.let { htmlToText(it) } ?: ""
         val replies = el.selectFirst("blockquote.replies")
-            ?.select("> div.comment")?.mapNotNull { parseComment(it) }.orEmpty()
-        return Comment(id, author, score, timeAgo, body, isOp, isMod, replies)
+            ?.select("> div.comment")?.mapNotNull { parseComment(it, id) }.orEmpty()
+        return Comment(id, author, score, timeAgo, body, isOp, isMod, parentId, replies)
     }
 
     /** Minimal HTML -> readable plain text: paragraphs and <br> become newlines. */

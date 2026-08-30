@@ -118,6 +118,7 @@ object FeedCache {
             .put("body", c.body)
             .put("isOp", c.isOp)
             .put("isMod", c.isMod)
+            .put("parent", c.parentId ?: "")
             .put("replies", replies)
     }
 
@@ -133,6 +134,7 @@ object FeedCache {
                 body = o.getString("body"),
                 isOp = o.getBoolean("isOp"),
                 isMod = o.getBoolean("isMod"),
+                parentId = o.optString("parent").ifEmpty { null },
                 replies = parseComments(o.getJSONArray("replies")),
             ))
         }

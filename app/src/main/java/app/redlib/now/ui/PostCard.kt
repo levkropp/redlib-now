@@ -33,6 +33,7 @@ fun PostCard(
     onClick: () -> Unit,
     onOpenComments: () -> Unit,
     onOpenMedia: () -> Unit,
+    onOpenUser: (String) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -56,7 +57,14 @@ fun PostCard(
                 )
                 HeaderDot()
                 post.author?.let {
-                    Text("u/$it", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(
+                        "u/$it",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.clickable { onOpenUser(it) },
+                    )
                     HeaderDot()
                 }
                 post.timeAgo?.let {
