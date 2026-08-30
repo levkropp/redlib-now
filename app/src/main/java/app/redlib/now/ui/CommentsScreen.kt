@@ -223,15 +223,19 @@ private fun CommentPostHeader(post: Post, onOpenMedia: (Post) -> Unit, onOpenUse
 @OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun CommentNode(comment: Comment, depth: Int, onLongPress: (Comment) -> Unit = {}) {
-    val startCollapsed = (depth > 0 && app.redlib.now.data.Settings.collapseThreads) ||
+    // First four levels always expand; the collapse setting folds level 5+.
+    val startCollapsed = (depth > 4 && app.redlib.now.data.Settings.collapseThreads) ||
         (app.redlib.now.data.Settings.collapseAutoMod && comment.author.equals("AutoModerator", true))
     var expanded by remember(comment.id) { mutableStateOf(!startCollapsed) }
     val replyCount = comment.replies.recursiveCount()
 
+    // Cap the visual indent so deep threads keep a usable text width
+    // (word wrap stays readable instead of collapsing into a sliver).
+    val visualDepth = minOf(depth, 4)
     Column(
         Modifier
-            .padding(start = (depth * 8).dp)
-            .padding(horizontal = 4.dp, vertical = 2.dp)
+            .padding(start = (visualDepth * 8).dp)
+            .padding(horizontal = if (depth > 2) 2.dp else 4.dp, vertical = 2.dp)
             .background(
                 if (depth > 0) MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
                 else MaterialTheme.colorScheme.surface,
