@@ -64,6 +64,20 @@ All network activity is logged under the `NowRedlib` logcat tag:
 adb logcat -s NowRedlib
 ```
 
+## Parity with the classic app
+
+Now for Redlib covers the classic Now for Reddit ergonomics that work
+read-only: feed sorts (hot/new/rising/top/controversial with time spans),
+comment sorts, comment actions (copy / jump to parent / author profile),
+read-only user profiles, link-preview cards, viewer share/copy/save,
+the full settings screens (appearance / behaviour / filters / gestures),
+grid-vs-list subreddit browsing, saved posts, per-subreddit accent
+themes, and post search.
+
+**Out of scope by design** (require a Reddit account, which this app
+never touches): voting, submitting posts, replying/editing/deleting
+comments, multireddits, and the message inbox.
+
 ## Notes
 
 - Read-only by design: no login, no voting, no replying — no Reddit API

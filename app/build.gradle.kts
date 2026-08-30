@@ -12,8 +12,8 @@ android {
         applicationId = "app.redlib.now"
         minSdk = 26
         targetSdk = 34
-        versionCode = 20260827
-        versionName = "2026.08.27"
+        versionCode = 20260829
+        versionName = "2026.08.29"
     }
 
     buildTypes {
