@@ -15,5 +15,9 @@ class NowApp : Application(), ImageLoaderFactory {
         ImageLoader.Builder(this)
             .okHttpClient(Http.client)
             .crossfade(true)
+            // Animated GIFs (giphy embeds in comments) decode & auto-play.
+            .components {
+                add(coil.decode.GifDecoder.Factory())
+            }
             .build()
 }

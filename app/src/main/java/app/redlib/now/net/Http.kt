@@ -55,13 +55,17 @@ object Http {
         .readTimeout(20, TimeUnit.SECONDS)
         .followRedirects(true)
         .addInterceptor { chain ->
-            chain.proceed(
-                chain.request().newBuilder()
+            val req = chain.request()
+            Logd.d("HTTP -> ${req.url}")
+            val resp = chain.proceed(
+                req.newBuilder()
                     .header("User-Agent", USER_AGENT)
                     .header("Accept", "text/html,application/xhtml+xml,*/*;q=0.8")
                     .header("Accept-Language", "en-US,en;q=0.9")
                     .build()
             )
+            Logd.d("HTTP ${resp.code} <- ${req.url}")
+            resp
         }
         .build()
 }

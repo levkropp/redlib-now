@@ -16,6 +16,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -284,11 +285,15 @@ private fun CommentNode(comment: Comment, depth: Int, onLongPress: (Comment) -> 
         if (expanded) {
             if (comment.body.isNotBlank()) {
                 Text(
-                    comment.body,
+                    linkify(comment.body, MaterialTheme.colorScheme.secondary),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurface,
                     modifier = Modifier.padding(top = 3.dp),
                 )
+            }
+            // Giphy links render as inline auto-playing (muted, looping) clips.
+            extractGiphyIds(comment.body).forEach { id ->
+                GifClip(id)
             }
             comment.replies.forEach { CommentNode(it, depth + 1, onLongPress) }
         } else if (replyCount > 0) {
@@ -304,6 +309,37 @@ private fun CommentNode(comment: Comment, depth: Int, onLongPress: (Comment) -> 
 }
 
 private fun List<Comment>.recursiveCount(): Long = sumOf { 1L + it.replies.recursiveCount() }
+
+/** Inline auto-playing giphy clip: muted, looping mp4 via ExoPlayer. */
+@Composable
+private fun GifClip(id: String) {
+    val context = androidx.compose.ui.platform.LocalContext.current
+    val url = "https://media.giphy.com/media/$id/giphy-downsized-small.mp4"
+    val player = remember(id) {
+        androidx.media3.exoplayer.ExoPlayer.Builder(context).build().apply {
+            setMediaItem(androidx.media3.common.MediaItem.fromUri(url))
+            repeatMode = androidx.media3.common.Player.REPEAT_MODE_ONE
+            volume = 0f
+            prepare()
+            playWhenReady = true
+        }
+    }
+    androidx.compose.runtime.DisposableEffect(id) {
+        onDispose { player.release() }
+    }
+    androidx.compose.ui.viewinterop.AndroidView(
+        factory = { ctx -> androidx.media3.ui.PlayerView(ctx).apply {
+            this.player = player
+            useController = false
+        } },
+        modifier = Modifier
+            .padding(top = 6.dp)
+            .width(220.dp)
+            .height(180.dp)
+            .clip(RoundedCornerShape(8.dp))
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+    )
+}
 
 /** Drag right to go back (classic "swipe back" gesture), when enabled. */
 private fun Modifier.swipeBack(enabled: Boolean, onBack: () -> Unit): Modifier =

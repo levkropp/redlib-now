@@ -9,6 +9,19 @@ import androidx.compose.ui.text.withLink
 import androidx.compose.ui.graphics.Color
 
 private val URL_RE = Regex("""(https?://[^\s)]+)""")
+private val GIPHY_RE = Regex("""https?://(?:www\.)?giphy\.com/gifs/[A-Za-z0-9_-]+""")
+
+/**
+ * Extract giphy media IDs from text (comment bodies). Handles both
+ * /gifs/<ID> and /gifs/<slug>-<ID> URL shapes.
+ */
+fun extractGiphyIds(text: String): List<String> =
+    GIPHY_RE.findAll(text)
+        .map { it.value.substringAfterLast("/") }
+        .map { if (it.contains('-')) it.substringAfterLast('-') else it }
+        .filter { it.length >= 6 && it.all { c -> c.isLetterOrDigit() } }
+        .distinct()
+        .toList()
 
 /**
  * Turns raw text (comment bodies, selftext) into an [AnnotatedString] with
