@@ -32,3 +32,10 @@ object NowColors {
     val Nsfw = Color(0xFFE23B3B)
     val Spoiler = Color(0xFFB8860B)
 }
+
+/** Deterministic per-subreddit accent color (classic "subreddit theme"). */
+fun subredditColor(name: String): Color {
+    var h = 0
+    for (c in name.lowercase()) h = (h * 31 + c.code) and 0x7fffffff
+    return Color.hsv((h % 360).toFloat(), 0.55f, 0.95f)
+}

@@ -24,6 +24,9 @@ import app.redlib.now.ui.MediaViewer
 import app.redlib.now.ui.NowRedlibTheme
 import app.redlib.now.ui.SearchScreen
 import app.redlib.now.ui.SettingsScreen
+import app.redlib.now.ui.SavedScreen
+import app.redlib.now.ui.SubredditBrowseScreen
+import app.redlib.now.ui.PostSearchScreen
 import app.redlib.now.ui.UserScreen
 
 class MainActivity : ComponentActivity() {
@@ -48,9 +51,39 @@ class MainActivity : ComponentActivity() {
                 var userProfile by remember { mutableStateOf<String?>(null) }
                 var showSearch by remember { mutableStateOf(false) }
                 var showSettings by remember { mutableStateOf(false) }
+                var showSaved by remember { mutableStateOf(false) }
+                var showBrowse by remember { mutableStateOf(false) }
+                var postSearchSub by remember { mutableStateOf<String?>(null) }
+                var postSearchOpen by remember { mutableStateOf(false) }
 
                 when {
                     showSettings -> SettingsScreen(onBack = { showSettings = false })
+                    showSaved -> SavedScreen(
+                        onBack = { showSaved = false },
+                        onOpenPost = { post ->
+                            showSaved = false
+                            if (post.imageUrl != null && post.externalUrl == null) viewerPost = post else commentsPost = post
+                        },
+                        onOpenComments = { commentsPost = it },
+                        onOpenMedia = { viewerPost = it },
+                    )
+                    showBrowse -> SubredditBrowseScreen(
+                        onBack = { showBrowse = false },
+                        onOpenSubreddit = {
+                            showBrowse = false
+                            vm.load("/r/$it")
+                        },
+                    )
+                    postSearchOpen -> PostSearchScreen(
+                        subreddit = postSearchSub,
+                        onBack = { postSearchOpen = false },
+                        onOpenPost = { post ->
+                            postSearchOpen = false
+                            if (post.imageUrl != null && post.externalUrl == null) viewerPost = post else commentsPost = post
+                        },
+                        onOpenComments = { commentsPost = it },
+                        onOpenMedia = { viewerPost = it },
+                    )
                     viewerPost != null -> MediaViewer(
                         post = viewerPost!!,
                         onClose = { viewerPost = null },
@@ -93,6 +126,12 @@ class MainActivity : ComponentActivity() {
                         onOpenMedia = { viewerPost = it },
                         onOpenUser = { userProfile = it },
                         onOpenSettings = { showSettings = true },
+                        onOpenSaved = { showSaved = true },
+                        onOpenBrowse = { showBrowse = true },
+                        onOpenPostSearch = { sub ->
+                            postSearchSub = sub
+                            postSearchOpen = true
+                        },
                         onOpenFeed = { vm.load(it) },
                     )
                 }

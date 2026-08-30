@@ -109,7 +109,7 @@ fun MediaViewer(post: Post, onClose: () -> Unit) {
                 }
             }
         } else {
-            ZoomableImage(absoluteUrl(post.imageUrl))
+            ZoomableImage(absoluteUrl(post.imageUrl), onClose = if (app.redlib.now.data.Settings.tapToCloseImages) onClose else ({ }))
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -225,7 +225,7 @@ private fun saveToGallery(context: android.content.Context, file: File, isVideo:
 }
 
 @Composable
-private fun ZoomableImage(url: String) {
+private fun ZoomableImage(url: String, onClose: () -> Unit = {}) {
     // Serve the local copy when we have it; fetch one for offline otherwise.
     val model = MediaCache.localUri(url) ?: url
     LaunchedEffect(url) { if (MediaCache.localUri(url) == null) MediaCache.getOrDownload(url) }
@@ -248,11 +248,14 @@ private fun ZoomableImage(url: String) {
                 // pinch is in progress or the image is zoomed in. A plain tap
                 // stays unconsumed so the close button on top stays clickable.
                 awaitEachGesture {
-                    awaitFirstDown(requireUnconsumed = false)
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    val start = android.os.SystemClock.uptimeMillis()
+                    var moved = false
                     do {
                         val event = awaitPointerEvent()
                         val pinching = event.changes.size > 1
                         if (pinching || scale > 1f) {
+                            moved = true
                             val zoom = event.calculateZoom()
                             val pan = event.calculatePan()
                             scale = (scale * zoom).coerceIn(1f, 8f)
@@ -260,6 +263,10 @@ private fun ZoomableImage(url: String) {
                             event.changes.forEach { it.consume() }
                         }
                     } while (event.changes.any { it.pressed })
+                    // Classic tap-to-close: quick, still tap on a non-zoomed image.
+                    if (!moved && android.os.SystemClock.uptimeMillis() - start < 250 && scale == 1f) {
+                        onClose()
+                    }
                 }
             },
     )

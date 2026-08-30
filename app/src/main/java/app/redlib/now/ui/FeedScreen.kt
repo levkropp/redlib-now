@@ -11,6 +11,8 @@ import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.BookmarkBorder
+import androidx.compose.material.icons.filled.GridOn
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -42,6 +44,9 @@ fun FeedScreen(
     onOpenMedia: (Post) -> Unit,
     onOpenUser: (String) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenSaved: () -> Unit = {},
+    onOpenBrowse: () -> Unit = {},
+    onOpenPostSearch: (String?) -> Unit = {},
     onOpenFeed: (String) -> Unit,
     onMarkRead: (String) -> Unit = {},
     statePositions: MutableMap<String, Pair<Int, Int>> = mutableMapOf(),
@@ -97,6 +102,31 @@ fun FeedScreen(
                     )
                 }
                 HorizontalDivider(Modifier.padding(vertical = 8.dp))
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Filled.BookmarkBorder, contentDescription = null) },
+                    label = { Text("Saved") },
+                    selected = false,
+                    onClick = onOpenSaved,
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                )
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                    label = { Text("Search posts") },
+                    selected = false,
+                    onClick = {
+                        onOpenPostSearch(
+                            if (currentFeed.startsWith("/r/")) currentFeed.removePrefix("/r/").removeSuffix("/") else null
+                        )
+                    },
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                )
+                NavigationDrawerItem(
+                    icon = { Icon(Icons.Filled.GridOn, contentDescription = null) },
+                    label = { Text("Browse subreddits") },
+                    selected = false,
+                    onClick = onOpenBrowse,
+                    modifier = Modifier.padding(NavigationDrawerItemDefaults.ItemPadding),
+                )
                 NavigationDrawerItem(
                     icon = { Icon(Icons.Filled.Settings, contentDescription = null) },
                     label = { Text("Settings") },

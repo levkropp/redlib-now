@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Bookmark
+import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.ChatBubbleOutline
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PlayArrow
@@ -52,7 +54,8 @@ fun PostCard(
                 Text(
                     "r/${post.subreddit}",
                     style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.secondary,
+                    color = subredditColor(post.subreddit),
+                    fontWeight = FontWeight.Bold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
@@ -182,6 +185,14 @@ fun PostCard(
                     Spacer(Modifier.width(4.dp))
                 }
                 Spacer(Modifier.weight(1f))
+                IconButton(onClick = { app.redlib.now.data.Repo.toggleSave(post) }, modifier = Modifier.size(32.dp)) {
+                    Icon(
+                        if (app.redlib.now.data.Repo.isSaved(post.id)) Icons.Filled.Bookmark else Icons.Filled.BookmarkBorder,
+                        contentDescription = "Save post",
+                        tint = if (app.redlib.now.data.Repo.isSaved(post.id)) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(16.dp),
+                    )
+                }
                 TextButton(
                     onClick = onOpenComments,
                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 0.dp),

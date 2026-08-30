@@ -30,6 +30,7 @@ object Repo {
         FeedCache.init(context)
         Settings.init(context)
         readPosts = loadReadPosts()
+        loadSaved()
     }
 
     // ---- read-post tracking (for "hide read posts") ----
@@ -41,6 +42,29 @@ object Repo {
         LinkedHashSet(prefs.getString(READ_KEY, "")!!.split(",").filter { it.isNotBlank() })
 
     fun isRead(id: String): Boolean = id in readPosts
+
+    // ---- saved posts (local bookmarks) ----
+    private val SAVED_KEY = "saved_posts"
+    private var savedPostsInternal: List<app.redlib.now.model.Post> = emptyList()
+    var savedState by androidx.compose.runtime.mutableStateOf<List<app.redlib.now.model.Post>>(emptyList())
+        private set
+
+    fun loadSaved() {
+        savedPostsInternal = FeedCache.loadFeed("_saved_")?.posts ?: emptyList()
+        savedState = savedPostsInternal
+    }
+
+    fun isSaved(id: String): Boolean = savedPostsInternal.any { it.id == id }
+
+    fun toggleSave(post: app.redlib.now.model.Post) {
+        savedPostsInternal = if (isSaved(post.id)) {
+            savedPostsInternal.filter { it.id != post.id }
+        } else {
+            listOf(post) + savedPostsInternal
+        }
+        savedState = savedPostsInternal
+        FeedCache.saveFeed("_saved_", savedPostsInternal)
+    }
 
     fun markRead(id: String) {
         if (id in readPosts) return
