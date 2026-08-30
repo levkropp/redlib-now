@@ -163,7 +163,7 @@ fun CommentsScreen(
             text = {
                 Column {
                     Text(
-                        mc.body.take(120),
+                        linkify(mc.body.take(120), MaterialTheme.colorScheme.secondary),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )

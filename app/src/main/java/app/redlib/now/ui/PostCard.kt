@@ -166,7 +166,7 @@ fun PostCard(
 
             post.selfTextPreview?.takeIf { app.redlib.now.data.Settings.showSelftext && post.imageUrl == null }?.let {
                 Text(
-                    it,
+                    linkify(it, MaterialTheme.colorScheme.secondary),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     maxLines = 2,

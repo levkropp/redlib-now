@@ -5,6 +5,8 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -30,6 +32,10 @@ import app.redlib.now.ui.PostSearchScreen
 import app.redlib.now.ui.UserScreen
 
 class MainActivity : ComponentActivity() {
+
+    /** Reddit URL pending routing (VIEW intents and shared text). */
+    private val incomingLink = mutableStateOf<String?>(null)
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         Repo.init(applicationContext)
@@ -135,8 +141,61 @@ class MainActivity : ComponentActivity() {
                         onOpenFeed = { vm.load(it) },
                     )
                 }
+
+            // Route pending reddit links: /r/x feeds, comment threads, user pages.
+            val pending = incomingLink.value
+            LaunchedEffect(pending) {
+                if (pending == null) return@LaunchedEffect
+                incomingLink.value = null
+                routeRedditLink(pending, openFeed = { path -> vm.load(path) },
+                    openComments = { commentsPost = it }, openUser = { userProfile = it })
+            }
               }
             }
+
+        }
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        incomingLink.value = extractLink(intent)
+    }
+
+    /** Pull a URL out of a VIEW intent's data or a shared-text SEND intent. */
+    private fun extractLink(intent: android.content.Intent?): String? {
+        if (intent == null) return null
+        intent.data?.let { return it.toString() }
+        if (intent.action == android.content.Intent.ACTION_SEND) {
+            val text = intent.getStringExtra(android.content.Intent.EXTRA_TEXT) ?: return null
+            return Regex("(https?://\\S+)").find(text)?.groupValues?.get(1)
+        }
+        return null
+    }
+
+    private fun routeRedditLink(
+        url: String,
+        openFeed: (String) -> Unit,
+        openComments: (Post) -> Unit,
+        openUser: (String) -> Unit,
+    ) {
+        val uri = android.net.Uri.parse(url) ?: return
+        val host = uri.host?.lowercase()?.removePrefix("www.")?.removePrefix("old.")?.removePrefix("m.") ?: return
+        if (host != "reddit.com") return
+        val segs = uri.pathSegments.filter { it.isNotBlank() }
+        when {
+            segs.size >= 4 && segs[0] == "r" && segs[2] == "comments" -> {
+                val sub = segs[1]; val id = segs[3]
+                val slug = if (segs.size >= 5) segs[4].replace('_', ' ') else "Post"
+                openComments(Post(
+                    id = id, subreddit = sub, author = null, title = slug,
+                    permalink = "/r/$sub/comments/$id/" + if (segs.size >= 5) segs[4] + "/" else "",
+                    flair = null, selfTextPreview = null, imageUrl = null, videoUrl = null,
+                    isVideo = false, score = null, commentCount = null, timeAgo = null, nsfw = false,
+                ))
+            }
+            segs.size >= 2 && segs[0] == "r" -> openFeed("/r/${segs[1]}")
+            segs.size >= 2 && (segs[0] == "u" || segs[0] == "user") -> openUser(segs[1])
+            else -> openFeed("/")
         }
     }
 }
