@@ -87,9 +87,15 @@ fun PostCard(
 
             Text(
                 post.title,
-                style = if (app.redlib.now.data.Settings.cardSize == "compact") MaterialTheme.typography.titleSmall else MaterialTheme.typography.titleMedium,
+                style = MaterialTheme.typography.titleMedium.copy(
+                    fontSize = when (app.redlib.now.data.Settings.cardSize) {
+                        "large" -> 19.sp
+                        "normal" -> 17.5.sp
+                        else -> 16.sp
+                    },
+                ),
                 fontWeight = FontWeight.SemiBold,
-                lineHeight = 17.sp,
+                lineHeight = 20.sp,
                 maxLines = if (app.redlib.now.data.Settings.cardSize == "large") 5 else 3,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.padding(horizontal = 10.dp, vertical = 5.dp),
