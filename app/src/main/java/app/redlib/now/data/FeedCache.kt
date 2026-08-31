@@ -130,6 +130,8 @@ object FeedCache {
             .put("isMod", c.isMod)
             .put("parent", c.parentId ?: "")
             .put("imageUrl", c.imageUrl ?: "")
+            .put("removed", c.removed)
+            .put("removedUrl", c.removedUrl ?: "")
             .put("replies", replies)
     }
 
@@ -147,6 +149,8 @@ object FeedCache {
                 isMod = o.getBoolean("isMod"),
                 parentId = o.optString("parent").ifEmpty { null },
                 imageUrl = o.optString("imageUrl").ifEmpty { null },
+                removed = o.getBoolean("removed"),
+                removedUrl = o.optString("removedUrl").ifEmpty { null },
                 replies = parseComments(o.getJSONArray("replies")),
             ))
         }

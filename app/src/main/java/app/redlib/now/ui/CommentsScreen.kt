@@ -290,7 +290,34 @@ private fun CommentNode(
             }
         }
         if (expanded) {
-            if (comment.body.isNotBlank()) {
+            if (comment.removed) {
+                Text(
+                    "[removed]",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.padding(top = 3.dp),
+                )
+                comment.removedUrl?.let { url ->
+                    val ctx = androidx.compose.ui.platform.LocalContext.current
+                    Text(
+                        "View removed comment",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier
+                            .padding(top = 2.dp)
+                            .clickable {
+                                try {
+                                    ctx.startActivity(android.content.Intent(
+                                        android.content.Intent.ACTION_VIEW,
+                                        android.net.Uri.parse(url)))
+                                } catch (t: Throwable) {
+                                    app.redlib.now.net.Logd.e("open removed-comment archive failed", t)
+                                }
+                            },
+                    )
+                }
+            } else if (comment.body.isNotBlank()) {
                 Text(
                     linkify(comment.body, MaterialTheme.colorScheme.secondary),
                     style = MaterialTheme.typography.bodySmall,

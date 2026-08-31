@@ -10,5 +10,7 @@ data class Comment(
     val isMod: Boolean,
     val parentId: String?,     // id of the parent comment, null for top-level
     val imageUrl: String? = null,  // inline media extracted from the body (instance-proxy)
+    val removed: Boolean = false,  // moderation-removed; body is a placeholder
+    val removedUrl: String? = null,    // archive link (pullpush) for viewing the original
     val replies: List<Comment>,
 )

@@ -26,14 +26,25 @@ object CommentParser {
             ?: scoreEl?.text()?.trim()?.takeIf { it != "•" }?.let { parseK(it) }
         val timeAgo = el.selectFirst("a.created")?.text()?.trim()?.ifEmpty { null }
         val bodyEl = el.selectFirst("div.comment_body")
-        val body = bodyEl?.let { htmlToText(it) } ?: ""
+        var body = bodyEl?.let { htmlToText(it) } ?: ""
+        // Moderation removals: Redlib renders "[removed] — <a>view removed
+        // comment</a>" with an archive link (pullpush). Keep the placeholder
+        // text and lift the archive URL out so the UI can link it properly.
+        var removedUrl: String? = null
+        val isRemoved = body.startsWith("[removed]")
+        if (isRemoved) {
+            removedUrl = bodyEl?.selectFirst("a[href^=http]")?.attr("href")
+                ?.takeIf { it.startsWith("http") }
+            body = "[removed]"
+        }
         // Inline media: reddit-hosted images render as <figure><img>; bare
         // image-only comments would otherwise parse to an empty body.
         val imgSrc = bodyEl?.selectFirst("img[src]")?.attr("src")?.takeIf { it.isNotBlank() }
         val imageUrl = imgSrc?.let { absolutize(it, baseUrl) }
         val replies = el.selectFirst("blockquote.replies")
             ?.select("> div.comment")?.mapNotNull { parseComment(it, id, baseUrl) }.orEmpty()
-        return Comment(id, author, score, timeAgo, body, isOp, isMod, parentId, imageUrl, replies)
+        return Comment(id, author, score, timeAgo, body, isOp, isMod, parentId, imageUrl,
+            isRemoved, removedUrl, replies)
     }
 
     /** Minimal HTML -> readable plain text: paragraphs and <br> become newlines. */
