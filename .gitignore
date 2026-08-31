@@ -11,3 +11,4 @@
 *.png
 !**/res/**/*.png
 !site/*.png
+*.jpg
