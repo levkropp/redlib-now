@@ -17,4 +17,5 @@ data class Post(
     val nsfw: Boolean,
     val externalUrl: String? = null, // link posts: external article URL
     val linkDomain: String? = null,  // link posts: e.g. "theguardian.com"
+    val isGallery: Boolean = false,  // gallery posts (multiple images)
 )

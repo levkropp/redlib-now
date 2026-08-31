@@ -58,13 +58,17 @@ fun UserScreen(
                     Modifier.pointerInput(Unit) {
                         awaitEachGesture {
                             awaitFirstDown(requireUnconsumed = false)
-                            var acc = 0f
+                            var accX = 0f
+                            var accY = 0f
                             do {
                                 val event = awaitPointerEvent()
                                 val ch = event.changes.firstOrNull()
-                if (ch != null) acc += ch.position.x - ch.previousPosition.x
+                                if (ch != null) {
+                                    accX += ch.position.x - ch.previousPosition.x
+                                    accY += ch.position.y - ch.previousPosition.y
+                                }
                             } while (event.changes.any { it.pressed })
-                            if (acc > 120f) onBack()
+                            if (accX > 120f && kotlin.math.abs(accX) > 2 * kotlin.math.abs(accY)) onBack()
                         }
                     }
                 else Modifier

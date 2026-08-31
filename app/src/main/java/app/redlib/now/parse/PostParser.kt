@@ -73,14 +73,23 @@ object PostParser {
         // domain in its <span>), optionally with a small preview image.
         var externalUrl: String? = null
         var linkDomain: String? = null
+        var isGallery = false
         el.selectFirst("a.post_thumbnail")?.let { thumb ->
             val href = thumb.attr("href")
-            if (href.startsWith("http")) {
-                externalUrl = href
-                linkDomain = thumb.selectFirst("span")?.text()?.trim()?.ifEmpty { null }
-                if (imageUrl == null) {
-                    thumb.selectFirst("img")?.attr("src")?.takeIf { it.isNotBlank() }
-                        ?.let { imageUrl = absolutize(it, baseUrl) }
+            val label = thumb.selectFirst("span")?.text()?.trim()?.lowercase()
+            val svgImg = thumb.selectFirst("svg image")?.attr("href")?.takeIf { it.isNotBlank() }
+                ?: thumb.selectFirst("img[src]")?.attr("src")?.takeIf { it.isNotBlank() }
+            when {
+                // External link post: href is the article URL.
+                href.startsWith("http") -> {
+                    externalUrl = href
+                    linkDomain = thumb.selectFirst("span")?.text()?.trim()?.ifEmpty { null }
+                    if (imageUrl == null && svgImg != null) imageUrl = absolutize(svgImg, baseUrl)
+                }
+                // Gallery post: relative permalink + a preview thumb.
+                label == "gallery" -> {
+                    isGallery = true
+                    if (imageUrl == null && svgImg != null) imageUrl = absolutize(svgImg, baseUrl)
                 }
             }
         }
@@ -102,6 +111,7 @@ object PostParser {
             nsfw = nsfw,
             externalUrl = externalUrl,
             linkDomain = linkDomain,
+            isGallery = isGallery,
         )
     }
 

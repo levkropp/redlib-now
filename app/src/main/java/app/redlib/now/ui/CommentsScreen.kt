@@ -397,13 +397,19 @@ private fun Modifier.swipeBack(enabled: Boolean, onBack: () -> Unit): Modifier =
         if (!enabled) return@pointerInput
         awaitEachGesture {
             awaitFirstDown(requireUnconsumed = false)
-            var acc = 0f
+            var accX = 0f
+            var accY = 0f
             do {
                 val event = awaitPointerEvent()
                 val ch = event.changes.firstOrNull()
-                if (ch != null) acc += ch.position.x - ch.previousPosition.x
+                if (ch != null) {
+                    accX += ch.position.x - ch.previousPosition.x
+                    accY += ch.position.y - ch.previousPosition.y
+                }
             } while (event.changes.any { it.pressed })
-            if (acc > 120f) onBack()
+            // Only a deliberately horizontal swipe navigates back; vertical
+            // scrolling with slight drift must not.
+            if (accX > 120f && kotlin.math.abs(accX) > 2 * kotlin.math.abs(accY)) onBack()
         }
     }
 

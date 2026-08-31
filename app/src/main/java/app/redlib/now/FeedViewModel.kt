@@ -31,6 +31,7 @@ class FeedViewModel : ViewModel() {
         private set
 
     private val loadedPaths = mutableSetOf<String>()
+    private var fetchJob: kotlinx.coroutines.Job? = null
 
     init {
         load("/", initial = true)
@@ -69,7 +70,8 @@ class FeedViewModel : ViewModel() {
             state = FeedUiState(loading = true)
         }
 
-        viewModelScope.launch {
+        fetchJob?.cancel()
+        fetchJob = viewModelScope.launch {
             try {
                 val response = client.fetch(fetchPath(path))
                 val posts = PostParser.parseFeed(response.html, response.baseUrl)

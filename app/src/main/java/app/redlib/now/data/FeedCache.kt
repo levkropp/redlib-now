@@ -88,6 +88,7 @@ object FeedCache {
         .put("nsfw", p.nsfw)
         .put("externalUrl", p.externalUrl ?: "")
         .put("linkDomain", p.linkDomain ?: "")
+        .put("isGallery", p.isGallery)
 
     private fun parsePosts(arr: JSONArray): List<Post> = (0 until arr.length()).map { i ->
         val o = arr.getJSONObject(i)
@@ -108,6 +109,7 @@ object FeedCache {
             nsfw = o.getBoolean("nsfw"),
             externalUrl = o.optString("externalUrl").ifEmpty { null },
             linkDomain = o.optString("linkDomain").ifEmpty { null },
+            isGallery = o.getBoolean("isGallery"),
         )
     }
 

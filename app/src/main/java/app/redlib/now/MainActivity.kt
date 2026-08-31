@@ -38,6 +38,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        incomingLink.value = extractLink(intent)
         Repo.init(applicationContext)
         enableEdgeToEdge()
         // Immersive: status bar stays hidden while browsing, swipe from the

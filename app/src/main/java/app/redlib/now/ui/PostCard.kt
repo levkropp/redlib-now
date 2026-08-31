@@ -9,6 +9,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bookmark
 import androidx.compose.material.icons.filled.BookmarkBorder
 import androidx.compose.material.icons.filled.ChatBubbleOutline
+import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material.icons.filled.Link
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Share
@@ -109,7 +110,10 @@ fun PostCard(
                     Modifier
                         .fillMaxWidth()
                         .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .clickable(onClick = onOpenMedia),
+                        .clickable {
+                            app.redlib.now.net.Logd.d("card media tap: gallery=" + post.isGallery + " " + post.id)
+                            if (post.isGallery) onOpenComments() else onOpenMedia()
+                        },
                 ) {
                     AsyncImage(
                         model = app.redlib.now.data.MediaCache.localUri(post.imageUrl) ?: post.imageUrl,
@@ -117,8 +121,8 @@ fun PostCard(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxWidth().heightIn(max = if (app.redlib.now.data.Settings.cardSize == "large") 340.dp else if (app.redlib.now.data.Settings.cardSize == "normal") 280.dp else 220.dp),
                     )
-                    if (post.isVideo) {
-                        Icon(
+                    when {
+                        post.isVideo -> Icon(
                             Icons.Filled.PlayArrow,
                             contentDescription = "Play video",
                             tint = Color.White,
@@ -128,6 +132,17 @@ fun PostCard(
                                 .clip(CircleShape)
                                 .background(Color.Black.copy(alpha = 0.6f))
                                 .padding(10.dp),
+                        )
+                        post.isGallery -> Icon(
+                            Icons.Filled.PhotoLibrary,
+                            contentDescription = "Gallery",
+                            tint = Color.White,
+                            modifier = Modifier
+                                .align(Alignment.Center)
+                                .size(40.dp)
+                                .clip(CircleShape)
+                                .background(Color.Black.copy(alpha = 0.6f))
+                                .padding(8.dp),
                         )
                     }
                 }
