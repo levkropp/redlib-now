@@ -77,7 +77,7 @@ class MainActivity : ComponentActivity() {
                         onBack = { showSaved = false },
                         onOpenPost = { post ->
                             showSaved = false
-                            if (post.imageUrl != null && post.externalUrl == null) viewerPost = post else commentsPost = post
+                            if (post.isGallery || post.imageUrl == null || post.externalUrl != null) commentsPost = post else viewerPost = post
                         },
                         onOpenComments = { commentsPost = it },
                         onOpenMedia = { viewerPost = it },
@@ -94,7 +94,7 @@ class MainActivity : ComponentActivity() {
                         onBack = { postSearchOpen = false },
                         onOpenPost = { post ->
                             postSearchOpen = false
-                            if (post.imageUrl != null && post.externalUrl == null) viewerPost = post else commentsPost = post
+                            if (post.isGallery || post.imageUrl == null || post.externalUrl != null) commentsPost = post else viewerPost = post
                         },
                         onOpenComments = { commentsPost = it },
                         onOpenMedia = { viewerPost = it },
@@ -108,7 +108,7 @@ class MainActivity : ComponentActivity() {
                         onBack = { userProfile = null },
                         onOpenPost = { post ->
                             userProfile = null
-                            if (post.imageUrl != null) viewerPost = post else commentsPost = post
+                            if (post.isGallery || post.imageUrl == null) commentsPost = post else viewerPost = post
                         },
                         onOpenComments = { commentsPost = it },
                         onOpenMedia = { viewerPost = it },
@@ -136,7 +136,7 @@ class MainActivity : ComponentActivity() {
                         onOpenSearch = { showSearch = true },
                         onRefresh = { vm.refresh() },
                         onOpenPost = { post ->
-                            if (post.imageUrl != null) viewerPost = post else commentsPost = post
+                            if (post.isGallery || post.imageUrl == null) commentsPost = post else viewerPost = post
                         },
                         onOpenComments = { commentsPost = it },
                         onOpenMedia = { viewerPost = it },

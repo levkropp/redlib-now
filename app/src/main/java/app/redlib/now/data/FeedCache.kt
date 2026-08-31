@@ -34,7 +34,10 @@ object FeedCache {
         val f = fileFor(feedDir, path)
         if (!f.exists()) null else {
             val obj = JSONObject(f.readText())
-            CachedFeed(parsePosts(obj.getJSONArray("posts")), obj.getLong("savedAt"))
+            // v2 = entries carry isGallery; older caches are discarded so
+            // stale posts don't lose gallery/media behaviour after upgrade.
+            if (obj.optInt("v", 1) < 2) null
+            else CachedFeed(parsePosts(obj.getJSONArray("posts")), obj.getLong("savedAt"))
         }
     } catch (t: Throwable) {
         android.util.Log.w("NowRedlib", "feed cache read failed: ${t.message}")
@@ -43,6 +46,7 @@ object FeedCache {
 
     fun saveFeed(path: String, posts: List<Post>) = try {
         val obj = JSONObject()
+            .put("v", 2)
             .put("savedAt", System.currentTimeMillis())
             .put("path", path)
             .put("posts", JSONArray().apply { posts.forEach { put(postJson(it)) } })
