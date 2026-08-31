@@ -61,6 +61,7 @@ fun CommentsScreen(
     }
 
     LaunchedEffect(post.id, sort) {
+        app.redlib.now.net.Logd.i("CommentsScreen composing: " + post.title.take(30))
         // Cache-first: show the offline thread immediately, refresh from network.
         val key = post.permalink + "?sort=" + sort
         val cached = FeedCache.loadComments(key)

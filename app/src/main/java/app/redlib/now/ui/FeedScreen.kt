@@ -43,6 +43,7 @@ fun FeedScreen(
     onOpenComments: (Post) -> Unit,
     onOpenMedia: (Post) -> Unit,
     onOpenUser: (String) -> Unit,
+    onOpenGallery: (Post) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenSaved: () -> Unit = {},
     onOpenBrowse: () -> Unit = {},
@@ -267,6 +268,7 @@ fun FeedScreen(
                         onOpenComments = { onMarkRead(post.id); onOpenComments(post) },
                         onOpenMedia = { onOpenMedia(post) },
                         onOpenUser = onOpenUser,
+                        onOpenGallery = { onOpenGallery(post) },
                     )
                 }
                 if (state.loading) {

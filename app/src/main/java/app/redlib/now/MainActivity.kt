@@ -22,6 +22,7 @@ import app.redlib.now.data.Repo
 import app.redlib.now.model.Post
 import app.redlib.now.ui.CommentsScreen
 import app.redlib.now.ui.FeedScreen
+import app.redlib.now.ui.GalleryScreen
 import app.redlib.now.ui.MediaViewer
 import app.redlib.now.ui.NowRedlibTheme
 import app.redlib.now.ui.SearchScreen
@@ -63,8 +64,24 @@ class MainActivity : ComponentActivity() {
                 var postSearchSub by remember { mutableStateOf<String?>(null) }
                 var postSearchOpen by remember { mutableStateOf(false) }
                 var commentMedia by remember { mutableStateOf<Triple<String, String?, Boolean>?>(null) }
+                var galleryViewer by remember { mutableStateOf<Pair<String, String>?>(null) }
 
                 when {
+                    galleryViewer != null -> app.redlib.now.ui.GalleryScreen(
+                        permalink = galleryViewer!!.first,
+                        title = galleryViewer!!.second,
+                        onBack = { galleryViewer = null },
+                        onOpenComments = {
+                            galleryViewer = null
+                            commentsPost = Post(
+                                id = "gallery-" + galleryViewer!!.first,
+                                subreddit = "", author = null,
+                                title = galleryViewer!!.second, permalink = galleryViewer!!.first,
+                                flair = null, selfTextPreview = null, imageUrl = null, videoUrl = null,
+                                isVideo = false, score = null, commentCount = null, timeAgo = null, nsfw = false,
+                            )
+                        },
+                    )
                     commentMedia != null -> MediaViewer(
                         title = commentMedia!!.first,
                         imageUrl = commentMedia!!.second,
@@ -136,11 +153,19 @@ class MainActivity : ComponentActivity() {
                         onOpenSearch = { showSearch = true },
                         onRefresh = { vm.refresh() },
                         onOpenPost = { post ->
-                            if (post.isGallery || post.imageUrl == null) commentsPost = post else viewerPost = post
+                            if (post.isGallery) galleryViewer = Pair(post.permalink, post.title)
+                            else if (post.imageUrl == null) commentsPost = post else viewerPost = post
                         },
-                        onOpenComments = { commentsPost = it },
+                        onOpenComments = {
+                            app.redlib.now.net.Logd.i("nav: commentsPost set " + it.id)
+                            commentsPost = it
+                        },
                         onOpenMedia = { viewerPost = it },
                         onOpenUser = { userProfile = it },
+                        onOpenGallery = { post ->
+                            app.redlib.now.net.Logd.i("nav: galleryViewer set " + post.id)
+                            galleryViewer = Pair(post.permalink, post.title)
+                        },
                         onOpenSettings = { showSettings = true },
                         onOpenSaved = { showSaved = true },
                         onOpenBrowse = { showBrowse = true },

@@ -231,7 +231,7 @@ private fun saveToGallery(context: android.content.Context, file: File, isVideo:
 }
 
 @Composable
-private fun ZoomableImage(url: String, onClose: () -> Unit = {}) {
+internal fun ZoomableImage(url: String, onClose: () -> Unit = {}) {
     // Serve the local copy when we have it; fetch one for offline otherwise.
     val model = MediaCache.localUri(url) ?: url
     LaunchedEffect(url) { if (MediaCache.localUri(url) == null) MediaCache.getOrDownload(url) }

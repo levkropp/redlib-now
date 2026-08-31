@@ -39,6 +39,7 @@ fun PostCard(
     onOpenComments: () -> Unit,
     onOpenMedia: () -> Unit,
     onOpenUser: (String) -> Unit = {},
+    onOpenGallery: (Post) -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     Card(
@@ -112,7 +113,7 @@ fun PostCard(
                         .background(MaterialTheme.colorScheme.surfaceVariant)
                         .clickable {
                             app.redlib.now.net.Logd.d("card media tap: gallery=" + post.isGallery + " " + post.id)
-                            if (post.isGallery) onOpenComments() else onOpenMedia()
+                            if (post.isGallery) onOpenGallery(post) else onOpenMedia()
                         },
                 ) {
                     AsyncImage(

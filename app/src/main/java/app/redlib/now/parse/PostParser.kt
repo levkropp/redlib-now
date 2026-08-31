@@ -115,6 +115,14 @@ object PostParser {
         )
     }
 
+    /** Gallery posts: full image list from div.gallery > figure > img. */
+    fun parseGallery(html: String, baseUrl: String): List<String> {
+        val doc = Jsoup.parse(html, baseUrl)
+        return doc.select("div.gallery figure img[src]")
+            .map { absolutize(it.attr("src"), baseUrl) }
+            .filter { it.isNotBlank() }
+    }
+
     private fun absolutize(src: String, baseUrl: String): String = when {
         src.startsWith("http") -> src
         src.startsWith("/") -> baseUrl + src
