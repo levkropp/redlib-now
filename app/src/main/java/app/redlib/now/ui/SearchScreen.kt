@@ -96,8 +96,16 @@ fun SearchScreen(
                         }
                     }
                 }
-                item { SectionLabel("Browse") }
-                items(filteredSuggestions, key = { "s:$it" }) { sub ->
+                item { SectionLabel(if (q.isEmpty()) "Browse (type to filter ${Repo.SUGGESTIONS.size} subreddits)" else "Browse") }
+                if (q.isEmpty()) {
+                    item { Text(
+                        "${Repo.SUGGESTIONS.size} communities — start typing to narrow down, or browse the full grid from the drawer.",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                    ) }
+                }
+                items(filteredSuggestions.take(24), key = { "s:$it" }) { sub ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
