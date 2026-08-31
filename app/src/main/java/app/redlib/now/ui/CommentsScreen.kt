@@ -291,6 +291,13 @@ private fun CommentNode(
         }
         if (expanded) {
             if (comment.removed) {
+                // Recover the original text from the pullpush archive inline.
+                var recovered by remember(comment.id) { mutableStateOf<String?>(null) }
+                var archiveFailed by remember(comment.id) { mutableStateOf(false) }
+                LaunchedEffect(comment.id) {
+                    recovered = app.redlib.now.net.Pullpush.fetchRemovedBody(comment.id)
+                    if (recovered == null) archiveFailed = true
+                }
                 Text(
                     "[removed]",
                     style = MaterialTheme.typography.bodySmall,
@@ -298,23 +305,48 @@ private fun CommentNode(
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 3.dp),
                 )
-                comment.removedUrl?.let { url ->
-                    val ctx = androidx.compose.ui.platform.LocalContext.current
-                    Text(
-                        "View removed comment",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.secondary,
-                        modifier = Modifier
-                            .padding(top = 2.dp)
-                            .clickable {
-                                try {
-                                    ctx.startActivity(android.content.Intent(
-                                        android.content.Intent.ACTION_VIEW,
-                                        android.net.Uri.parse(url)))
-                                } catch (t: Throwable) {
-                                    app.redlib.now.net.Logd.e("open removed-comment archive failed", t)
-                                }
-                            },
+                when {
+                    recovered != null -> {
+                        Text(
+                            recovered!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurface,
+                            modifier = Modifier.padding(top = 3.dp),
+                        )
+                        Text(
+                            "recovered from archive",
+                            style = MaterialTheme.typography.labelSmall,
+                            fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(top = 2.dp),
+                        )
+                    }
+                    archiveFailed -> {
+                        val ctx = androidx.compose.ui.platform.LocalContext.current
+                        Text(
+                            "View removed comment",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.secondary,
+                            modifier = Modifier
+                                .padding(top = 2.dp)
+                                .clickable {
+                                    comment.removedUrl?.let {
+                                        try {
+                                            ctx.startActivity(android.content.Intent(
+                                                android.content.Intent.ACTION_VIEW,
+                                                android.net.Uri.parse(it)))
+                                        } catch (t: Throwable) {
+                                            app.redlib.now.net.Logd.e("open removed-comment archive failed", t)
+                                        }
+                                    }
+                                },
+                        )
+                    }
+                    else -> Text(
+                        "searching archive…",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(top = 2.dp),
                     )
                 }
             } else if (comment.body.isNotBlank()) {
