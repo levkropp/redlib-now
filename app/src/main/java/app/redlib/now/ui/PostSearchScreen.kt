@@ -31,6 +31,7 @@ fun PostSearchScreen(
     onOpenPost: (Post) -> Unit,
     onOpenComments: (Post) -> Unit,
     onOpenMedia: (Post) -> Unit,
+    onOpenSubreddit: (String) -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
     var query by remember { mutableStateOf("") }
@@ -44,7 +45,12 @@ fun PostSearchScreen(
         if (q.isEmpty()) return
         searching = true
         searched = true
-        val path = (subreddit?.let { "/r/$it" } ?: "") + "/search?q=" + java.net.URLEncoder.encode(q, "UTF-8")
+        val encoded = java.net.URLEncoder.encode(q, "UTF-8")
+        val path = if (subreddit != null) {
+            "/r/$subreddit/search?q=$encoded&restrict_sr=on"
+        } else {
+            "/search?q=$encoded"
+        }
         scope.launch {
             try {
                 val resp = Repo.client.fetch(path)
@@ -99,6 +105,7 @@ fun PostSearchScreen(
                         onClick = { onOpenPost(post) },
                         onOpenComments = { onOpenComments(post) },
                         onOpenMedia = { onOpenMedia(post) },
+                        onOpenSubreddit = onOpenSubreddit,
                     )
                 }
             }

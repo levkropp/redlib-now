@@ -10,22 +10,41 @@ import org.json.JSONArray
 import app.redlib.now.data.MediaCache
 import app.redlib.now.data.FeedCache
 
-/** App-wide singletons: one RedlibClient (its cookie cache survives screens) and subreddit history. */
+/**
+ * App-wide singletons: RedlibClient, pinned subs, and search history.
+ *
+ * Two separate lists on purpose:
+ * - [pinnedState] — explicit subscriptions (pin/unpin only on the subreddit feed top bar)
+ * - [searchHistoryState] — recent lookups from the search screen (delete = forget search only)
+ */
 object Repo {
     val client = RedlibClient()
 
     private const val PREFS = "sub_history"
-    private const val KEY = "history"
-    private const val MAX = 25
+    private const val KEY_PINNED = "pinned"
+    /** Legacy key — migrated into pinned once. */
+    private const val KEY_LEGACY_HISTORY = "history"
+    private const val KEY_SEARCH_HISTORY = "search_history"
+    private const val MAX_PINNED = 50
+    private const val MAX_SEARCH_HISTORY = 25
 
     private lateinit var prefs: SharedPreferences
 
-    /** Recent subreddits, most recent first. Backed by prefs, observable by Compose. */
-    var historyState by androidx.compose.runtime.mutableStateOf<List<String>>(emptyList())
+    /** Explicitly pinned subreddits (sidebar). Observable by Compose. */
+    var pinnedState by androidx.compose.runtime.mutableStateOf<List<String>>(emptyList())
+        private set
+
+    /**
+     * Recent search opens, most recent first. Does **not** include pinned
+     * subs (those live in the drawer). Observable by Compose.
+     */
+    var searchHistoryState by androidx.compose.runtime.mutableStateOf<List<String>>(emptyList())
         private set
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        pinnedState = loadPinned()
+        searchHistoryState = loadSearchHistory()
         MediaCache.init(context)
         FeedCache.init(context)
         Settings.init(context)
@@ -46,21 +65,27 @@ object Repo {
     // ---- saved posts (local bookmarks) ----
     private val SAVED_KEY = "saved_posts"
     private var savedPostsInternal: List<app.redlib.now.model.Post> = emptyList()
+    // Observable set of saved post IDs so isSaved() is a Compose state read.
+    // Without this, PostCard's bookmark icon never recomposes on toggle.
+    private val savedIdsState = androidx.compose.runtime.mutableStateOf<Set<String>>(emptySet())
     var savedState by androidx.compose.runtime.mutableStateOf<List<app.redlib.now.model.Post>>(emptyList())
         private set
 
     fun loadSaved() {
         savedPostsInternal = FeedCache.loadFeed("_saved_")?.posts ?: emptyList()
         savedState = savedPostsInternal
+        savedIdsState.value = savedPostsInternal.mapTo(LinkedHashSet<String>()) { it.id }
     }
 
-    fun isSaved(id: String): Boolean = savedPostsInternal.any { it.id == id }
+    fun isSaved(id: String): Boolean = id in savedIdsState.value
 
     fun toggleSave(post: app.redlib.now.model.Post) {
-        savedPostsInternal = if (isSaved(post.id)) {
-            savedPostsInternal.filter { it.id != post.id }
+        if (isSaved(post.id)) {
+            savedPostsInternal = savedPostsInternal.filter { it.id != post.id }
+            savedIdsState.value = savedIdsState.value - post.id
         } else {
-            listOf(post) + savedPostsInternal
+            savedPostsInternal = listOf(post) + savedPostsInternal
+            savedIdsState.value = savedIdsState.value + post.id
         }
         savedState = savedPostsInternal
         FeedCache.saveFeed("_saved_", savedPostsInternal)
@@ -73,29 +98,83 @@ object Repo {
         prefs.edit().putString(READ_KEY, readPosts.joinToString(",")).apply()
     }
 
-    fun history(): List<String> = historyState
+    fun history(): List<String> = pinnedState
 
-    fun add(sub: String) {
-        val s = sub.trim().removePrefix("r/").removePrefix("/r/").lowercase()
+    fun isPinned(sub: String): Boolean {
+        val s = normalize(sub)
+        return s.isNotEmpty() && s in pinnedState
+    }
+
+    /** Pin a subreddit (feed top-bar only). Also drops it from search history. */
+    fun pin(sub: String) {
+        val s = normalize(sub)
         if (s.isEmpty()) return
-        val next = (listOf(s) + historyState.filter { it != s }).take(MAX)
-        save(next)
-        historyState = next
+        val next = (listOf(s) + pinnedState.filter { it != s }).take(MAX_PINNED)
+        saveJson(KEY_PINNED, next)
+        pinnedState = next
+        // Pinned items don't belong in search history.
+        if (s in searchHistoryState) removeFromSearchHistory(s)
     }
 
-    fun remove(sub: String) {
-        val next = historyState.filter { it != sub }
-        save(next)
-        historyState = next
+    /** Unpin a subreddit (feed top-bar only). Does not touch search history. */
+    fun unpin(sub: String) {
+        val s = normalize(sub)
+        if (s.isEmpty()) return
+        val next = pinnedState.filter { it != s }
+        saveJson(KEY_PINNED, next)
+        pinnedState = next
     }
 
-    private fun load(): List<String> {
-        val arr = JSONArray(prefs.getString(KEY, "[]") ?: "[]")
+    /** @deprecated Prefer [pin] / [unpin]. */
+    fun add(sub: String) = pin(sub)
+
+    /** @deprecated Prefer [unpin]. */
+    fun remove(sub: String) = unpin(sub)
+
+    /**
+     * Record that the user opened [sub] from search.
+     * Skips if already pinned (sidebar covers those).
+     */
+    fun recordSearch(sub: String) {
+        val s = normalize(sub)
+        if (s.isEmpty() || s in pinnedState) return
+        val next = (listOf(s) + searchHistoryState.filter { it != s }).take(MAX_SEARCH_HISTORY)
+        saveJson(KEY_SEARCH_HISTORY, next)
+        searchHistoryState = next
+    }
+
+    /** Forget a search-history entry only — never unpins. */
+    fun removeFromSearchHistory(sub: String) {
+        val s = normalize(sub)
+        val next = searchHistoryState.filter { it != s }
+        saveJson(KEY_SEARCH_HISTORY, next)
+        searchHistoryState = next
+    }
+
+    private fun normalize(sub: String): String =
+        sub.trim().removePrefix("r/").removePrefix("/r/").lowercase()
+
+    private fun loadPinned(): List<String> {
+        val raw = prefs.getString(KEY_PINNED, null)
+        if (raw != null) return parseJsonList(raw)
+        // One-time migration from the old single "history" list.
+        val legacy = prefs.getString(KEY_LEGACY_HISTORY, null) ?: return emptyList()
+        val migrated = parseJsonList(legacy)
+        saveJson(KEY_PINNED, migrated)
+        return migrated
+    }
+
+    private fun loadSearchHistory(): List<String> =
+        parseJsonList(prefs.getString(KEY_SEARCH_HISTORY, "[]") ?: "[]")
+            .filter { it !in pinnedState }
+
+    private fun parseJsonList(raw: String): List<String> {
+        val arr = JSONArray(raw)
         return (0 until arr.length()).map { arr.getString(it) }
     }
 
-    private fun save(list: List<String>) {
-        prefs.edit().putString(KEY, JSONArray(list).toString()).apply()
+    private fun saveJson(key: String, list: List<String>) {
+        prefs.edit().putString(key, JSONArray(list).toString()).apply()
     }
 
     /** Static suggestions shown under the history in the search screen. */

@@ -13,6 +13,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.navigationBars
 import app.redlib.now.data.Repo
 import app.redlib.now.model.Post
 
@@ -24,6 +27,7 @@ fun SavedScreen(
     onOpenPost: (Post) -> Unit,
     onOpenComments: (Post) -> Unit,
     onOpenMedia: (Post) -> Unit,
+    onOpenSubreddit: (String) -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
     Surface(
@@ -45,13 +49,19 @@ fun SavedScreen(
                 Text("Nothing saved yet — tap the bookmark on any card.", color = MaterialTheme.colorScheme.onSurfaceVariant)
             }
         } else {
-            LazyColumn(contentPadding = PaddingValues(vertical = 4.dp)) {
+            LazyColumn(
+                contentPadding = PaddingValues(
+                    top = 4.dp,
+                    bottom = 4.dp + WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding(),
+                ),
+            ) {
                 items(saved, key = { it.id }) { post ->
                     PostCard(
                         post = post,
                         onClick = { onOpenPost(post) },
                         onOpenComments = { onOpenComments(post) },
                         onOpenMedia = { onOpenMedia(post) },
+                        onOpenSubreddit = onOpenSubreddit,
                     )
                 }
             }

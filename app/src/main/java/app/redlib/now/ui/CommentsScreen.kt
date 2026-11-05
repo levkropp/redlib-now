@@ -216,6 +216,8 @@ private fun CommentPostHeader(post: Post, onOpenMedia: (Post) -> Unit, onOpenUse
                 onOpenComments = {},
                 onOpenMedia = { onOpenMedia(post) },
                 onOpenUser = onOpenUser,
+                // Subreddit navigation is handled by the comments screen chrome;
+                // leave default no-op so the header card stays non-navigating.
                 modifier = Modifier.padding(top = 6.dp),
             )
         }
@@ -361,8 +363,11 @@ private fun CommentNode(
             // images render as <figure><img>; image-only comments would
             // otherwise parse to an empty body).
             comment.imageUrl?.let { url ->
+                val imgUri = remember(url) {
+                    app.redlib.now.data.MediaCache.localUri(url) ?: url
+                }
                 coil.compose.AsyncImage(
-                    model = app.redlib.now.data.MediaCache.localUri(url) ?: url,
+                    model = imgUri,
                     contentDescription = null,
                     contentScale = androidx.compose.ui.layout.ContentScale.Fit,
                     modifier = Modifier
@@ -379,8 +384,7 @@ private fun CommentNode(
                 GifClip(id, onOpen = { onOpenMedia(it, true) })
             }
             comment.replies.forEach { CommentNode(it, depth + 1, onLongPress, onOpenMedia) }
-        } else if (replyCount > 0) {
-            Text(
+        } else if (replyCount > 0) {            Text(
                 "$replyCount ${if (replyCount == 1L) "reply" else "replies"} hidden",
                 style = MaterialTheme.typography.labelSmall,
                 fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
@@ -451,12 +455,16 @@ private fun GifClip(id: String, onOpen: (String) -> Unit = {}) {
     }
 }
 
-/** Drag right to go back (classic "swipe back" gesture), when enabled. */
-private fun Modifier.swipeBack(enabled: Boolean, onBack: () -> Unit): Modifier =
-    this.pointerInput(enabled) {
+/**
+ * Edge-only swipe-right to go back. Starts within [edgePx] of the left edge
+ * so normal list scrolling does not dismiss the screen.
+ */
+internal fun Modifier.swipeBack(enabled: Boolean, onBack: () -> Unit, edgePx: Float = 48f): Modifier =
+    this.pointerInput(enabled, edgePx) {
         if (!enabled) return@pointerInput
         awaitEachGesture {
-            awaitFirstDown(requireUnconsumed = false)
+            val down = awaitFirstDown(requireUnconsumed = false)
+            if (down.position.x > edgePx) return@awaitEachGesture
             var accX = 0f
             var accY = 0f
             do {
@@ -467,8 +475,6 @@ private fun Modifier.swipeBack(enabled: Boolean, onBack: () -> Unit): Modifier =
                     accY += ch.position.y - ch.previousPosition.y
                 }
             } while (event.changes.any { it.pressed })
-            // Only a deliberately horizontal swipe navigates back; vertical
-            // scrolling with slight drift must not.
             if (accX > 120f && kotlin.math.abs(accX) > 2 * kotlin.math.abs(accY)) onBack()
         }
     }

@@ -8,9 +8,30 @@ import org.jsoup.nodes.Element
 /** Parses Redlib subreddit/frontpage HTML into [Post]s. */
 object PostParser {
 
-    fun parseFeed(html: String, baseUrl: String): List<Post> {
+    data class FeedPage(val posts: List<Post>, val after: String?)
+
+    fun parseFeed(html: String, baseUrl: String): List<Post> = parseFeedPage(html, baseUrl).posts
+
+    /**
+     * Posts plus Reddit-style [after] cursor from the "next" link
+     * (e.g. ?sort=top&t=all&after=t3_xxx). Null [after] means end of listing.
+     */
+    fun parseFeedPage(html: String, baseUrl: String): FeedPage {
         val doc: Document = Jsoup.parse(html, baseUrl)
-        return doc.select("div.post").mapNotNull { el -> parsePost(el, baseUrl) }
+        val posts = doc.select("div.post").mapNotNull { el -> parsePost(el, baseUrl) }
+        val after = extractAfterCursor(doc)
+        return FeedPage(posts, after)
+    }
+
+    /** Prefer the last after= link (footer "next"); accept relative or absolute. */
+    private fun extractAfterCursor(doc: Document): String? {
+        val hrefs = doc.select("a[href*=after=]").map { it.attr("href") }.filter { it.isNotBlank() }
+        for (href in hrefs.asReversed()) {
+            val m = Regex("""[?&]after=([^&"']+)""").find(href) ?: continue
+            val v = m.groupValues[1].trim()
+            if (v.isNotEmpty()) return v
+        }
+        return null
     }
 
     fun parsePost(el: Element, baseUrl: String): Post? {
@@ -41,10 +62,21 @@ object PostParser {
             val video = media.selectFirst("video")
             if (video != null) {
                 isVideo = true
-                imageUrl = absolutize(video.attr("poster"), baseUrl)
-                val src = video.selectFirst("source")?.attr("src")?.ifEmpty { null }
-                    ?: video.attr("src").ifEmpty { null }
-                videoUrl = src?.let { absolutize(it, baseUrl) }
+                val poster = video.attr("poster").ifEmpty { null }
+                if (poster != null) imageUrl = absolutize(poster, baseUrl)
+                // Prefer first non-empty <source>. With HLS on, Redlib often
+                // emits m3u8 first and an empty mp4 second — skip blanks.
+                // Prefer HLS/m3u8 so MediaCache can resolve CMAF video+audio.
+                val sources = video.select("source")
+                    .map { it.attr("src").trim() to (it.attr("type") ?: "") }
+                    .filter { it.first.isNotEmpty() }
+                val preferred = sources.firstOrNull { (src, type) ->
+                    type.contains("mpegurl", ignoreCase = true) ||
+                        src.contains(".m3u8", ignoreCase = true)
+                }?.first
+                    ?: sources.firstOrNull()?.first
+                    ?: video.attr("src").trim().ifEmpty { null }
+                videoUrl = preferred?.let { absolutize(it, baseUrl) }
             } else {
                 val svgImg = media.selectFirst("svg image")?.attr("href")?.ifEmpty { null }
                     ?: media.selectFirst("svg image")?.attr("src")?.ifEmpty { null }

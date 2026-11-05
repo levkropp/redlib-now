@@ -30,6 +30,7 @@ fun UserScreen(
     onOpenPost: (Post) -> Unit,
     onOpenComments: (Post) -> Unit,
     onOpenMedia: (Post) -> Unit,
+    onOpenSubreddit: (String) -> Unit = {},
 ) {
     BackHandler(onBack = onBack)
 
@@ -53,26 +54,7 @@ fun UserScreen(
         Modifier
             .fillMaxSize()
             .background(MaterialTheme.colorScheme.background)
-            .then(
-                if (app.redlib.now.data.Settings.swipeBack)
-                    Modifier.pointerInput(Unit) {
-                        awaitEachGesture {
-                            awaitFirstDown(requireUnconsumed = false)
-                            var accX = 0f
-                            var accY = 0f
-                            do {
-                                val event = awaitPointerEvent()
-                                val ch = event.changes.firstOrNull()
-                                if (ch != null) {
-                                    accX += ch.position.x - ch.previousPosition.x
-                                    accY += ch.position.y - ch.previousPosition.y
-                                }
-                            } while (event.changes.any { it.pressed })
-                            if (accX > 120f && kotlin.math.abs(accX) > 2 * kotlin.math.abs(accY)) onBack()
-                        }
-                    }
-                else Modifier
-            )
+            .swipeBack(enabled = app.redlib.now.data.Settings.swipeBack, onBack = onBack),
     ) {
         TopAppBar(
             navigationIcon = {
@@ -101,6 +83,7 @@ fun UserScreen(
                         onClick = { onOpenPost(post) },
                         onOpenComments = { onOpenComments(post) },
                         onOpenMedia = { onOpenMedia(post) },
+                        onOpenSubreddit = onOpenSubreddit,
                     )
                 }
             }

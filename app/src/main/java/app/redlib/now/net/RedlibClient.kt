@@ -9,7 +9,8 @@ import java.util.concurrent.atomic.AtomicReference
  * Fetches Redlib pages, transparently handling:
  *  - Anubis proof-of-work challenges (solved on-device, cookie cached),
  *  - load-balancer meta-refresh redirects between instance backends,
- *  - instance rotation when an instance is unreachable or refuses us (403).
+ *  - instance rotation when an instance is unreachable or refuses us (403),
+ *  - optional user-pinned instance from [app.redlib.now.data.Settings.preferredInstance].
  *
  * Every step is logged under the "NowRedlib" logcat tag.
  */
@@ -21,12 +22,35 @@ class RedlibClient(
     private val currentBase = AtomicReference<String?>(null)
     private var allInstances: List<String> = emptyList()
 
+    /** Currently selected base URL, if any (after warm-up / last successful fetch). */
+    fun activeBase(): String? = currentBase.get()
+
+    /**
+     * Apply a Settings change immediately: clear sticky base so the next
+     * fetch re-warms against Auto or the pinned URL.
+     */
+    fun applyPreferredFromSettings() {
+        currentBase.set(null)
+    }
+
+    private fun pinnedFromSettings(): String? {
+        val p = app.redlib.now.data.Settings.preferredInstance.trim().removeSuffix("/")
+        return if (p.isBlank() || p.equals("auto", ignoreCase = true)) null else p
+    }
+
     /** Health-check instances and pick the first one that serves real posts. */
     suspend fun warmUp(): String? = withContext(Dispatchers.IO) {
         allInstances = instancesProvider()
-        Logd.i("warmUp: ${allInstances.size} candidate instances: $allInstances")
+        val pinned = pinnedFromSettings()
+        val order = if (pinned != null) {
+            // User pinned a host: try it first, then the rest as emergency fallbacks.
+            (listOf(pinned) + allInstances).distinct()
+        } else {
+            allInstances
+        }
+        Logd.i("warmUp: ${order.size} candidates (pinned=$pinned): $order")
         val failures = mutableListOf<String>()
-        for (candidate in allInstances) {
+        for (candidate in order) {
             try {
                 Logd.i("warmUp: trying $candidate ...")
                 val resp = fetchInternal(candidate, "/r/popular")
@@ -41,15 +65,28 @@ class RedlibClient(
                 Logd.e("warmUp: $candidate failed: ${t.message}", t)
                 failures += "$candidate: ${t.message}"
             }
+            // Strict pin: do not silently roam if the user forced this host.
+            if (pinned != null && candidate == pinned) {
+                Logd.e("warmUp: pinned instance $pinned failed; not auto-rotating")
+                break
+            }
         }
         Logd.e("warmUp: ALL instances failed:\n${failures.joinToString("\n")}")
         null
     }
 
     suspend fun fetch(path: String): Response = withContext(Dispatchers.IO) {
+        val pinned = pinnedFromSettings()
         val tried = mutableListOf<String>()
-        var base: String = currentBase.get() ?: warmUp()
+        var base: String = currentBase.get()
+            ?: pinned
+            ?: warmUp()
             ?: throw Exception("No working Redlib instance found")
+        // If pinned and current base drifted (e.g. old session), snap back.
+        if (pinned != null && base != pinned && !base.startsWith(pinned)) {
+            base = pinned
+            currentBase.set(pinned)
+        }
         while (true) {
             try {
                 Logd.i("fetch: GET $base$path")
@@ -63,6 +100,10 @@ class RedlibClient(
             } catch (e: InstanceDeadException) {
                 Logd.w("fetch: $base is dead (${e.cause?.message}), rotating...")
                 tried += base
+                if (pinned != null) {
+                    // User asked for a specific host — surface the failure instead of hopping away.
+                    throw Exception("Pinned instance $pinned is unreachable", e)
+                }
                 allInstances = (allInstances + InstanceDiscovery.FALLBACK).distinct()
                 val next = allInstances.firstOrNull { it !in tried }
                     ?: throw Exception("All Redlib instances failed", e)
@@ -87,7 +128,7 @@ class RedlibClient(
             hops++
             val url = currentBase + currentPath
             Logd.d("hop#$hops GET $url")
-            val call = Http.client.newCall(Request.Builder().url(url).build())
+            val call = Http.rawClient.newCall(Request.Builder().url(url).build())
             val resp = call.execute()
             val code = resp.code
             val body = resp.use { it.body?.string() }
@@ -103,10 +144,10 @@ class RedlibClient(
                 }
                 val t0 = System.currentTimeMillis()
                 val solution = kotlinx.coroutines.runBlocking { Anubis.solveOffMain(challenge) }
-                Logd.i("hop#$hops: Anubis challenge id=${challenge.id} diff=${challenge.difficulty} " +
+                Logd.i("hop#$hops: Anubis challenge id=${challenge.id} algo=${challenge.algorithm} diff=${challenge.difficulty} " +
                     "solved nonce=${solution.nonce} in ${System.currentTimeMillis() - t0}ms")
                 val passUrl = Anubis.passChallengeUrl(currentBase, currentPath, challenge, solution, 500)
-                Http.client.newCall(Request.Builder().url(passUrl).build()).execute().use { pass ->
+                Http.rawClient.newCall(Request.Builder().url(passUrl).build()).execute().use { pass ->
                     val passBody = pass.body?.string().orEmpty()
                     Logd.i("hop#$hops: pass-challenge status=${pass.code} len=${passBody.length} " +
                         "cookiesNow=${run { val h = okhttp3.HttpUrl.Companion.run { url.toHttpUrl() }; Http.cookieJar.loadForRequest(h).map { it.name } }}")
@@ -146,4 +187,56 @@ class RedlibClient(
     }
 
     fun baseUrl(): String? = currentBase.get()
+
+    /**
+     * Ensure we hold a valid Anubis clearance cookie for [base].
+     * Used by media downloads when the host returns challenge HTML / 401-429
+     * instead of media bytes. Does not require a full feed parse.
+     *
+     * @return true if a media retry is worth attempting.
+     */
+    fun ensureAuth(base: String?): Boolean {
+        val b = base?.trim()?.removeSuffix("/") ?: return false
+        if (b.isEmpty()) return false
+        // A couple of passes — challenge pages sometimes race with cookie settle.
+        repeat(2) { pass ->
+            try {
+                val url = "$b/"
+                val body = Http.rawClient.newCall(Request.Builder().url(url).build())
+                    .execute().use { it.body?.string().orEmpty() }
+                if (body.isEmpty()) return@repeat
+                if (!Anubis.isChallenge(body) && "Access Denied" !in body) {
+                    return true
+                }
+                val challenge = Anubis.extractChallenge(body)
+                if (challenge == null) {
+                    Logd.w("ensureAuth: challenge unreadable / access denied on $b (pass ${pass + 1})")
+                    Thread.sleep(300)
+                    return@repeat
+                }
+                val t0 = System.currentTimeMillis()
+                val solution = kotlinx.coroutines.runBlocking { Anubis.solveOffMain(challenge) }
+                Logd.i(
+                    "ensureAuth: solved ${challenge.id} algo=${challenge.algorithm} " +
+                        "in ${System.currentTimeMillis() - t0}ms (pass ${pass + 1})",
+                )
+                val passUrl = Anubis.passChallengeUrl(b, "/", challenge, solution, 500)
+                Http.rawClient.newCall(Request.Builder().url(passUrl).build()).execute().use { resp ->
+                    Logd.i("ensureAuth: pass-challenge status=${resp.code}")
+                }
+                Thread.sleep(200)
+                // Verify we can fetch without a wall.
+                val check = Http.rawClient.newCall(Request.Builder().url(url).build())
+                    .execute().use { it.body?.string().orEmpty() }
+                if (check.isNotEmpty() && !Anubis.isChallenge(check) && "Access Denied" !in check) {
+                    return true
+                }
+            } catch (t: Throwable) {
+                Logd.w("ensureAuth failed for $b: ${t.message}")
+                Thread.sleep(300)
+            }
+        }
+        return false
+    }
 }
+
